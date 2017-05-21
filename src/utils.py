@@ -27,13 +27,34 @@ def get_file_content(file_path):
     return None
 
 
-def exec_command(command, timeout=30):
+def write_into_file(file_path, content):
+    try:
+        with open(file_path, 'w') as fd:
+            fd.write(content)
+            return True
+    except Exception as e:
+        write_error('write_into_file failed: "{}": {}'.format(file_path, e))
+    return False
+
+
+def exec_command(command, timeout=None):
     child = subprocess.Popen(command, stdout=subprocess.PIPE,
                              stderr=subprocess.PIPE)
     stdout, stderr = child.communicate(timeout=timeout)
     return (child.returncode == 0,
             convert_to_string(stdout),
             convert_to_string(stderr))
+
+
+def exec_command_and_print_error(command, timeout=None):
+    ret, stdout, stderr = exec_command(command, timeout=timeout)
+    if not ret:
+        write_error('Command "{}" failed:'.format(' '.join(command)))
+        if len(stdout) > 0:
+            write_error('=== STDOUT ===\n{}\n'.format(stdout))
+        if len(stderr) > 0:
+            write_error('=== STDERR ===\n{}\n'.format(stderr))
+    return ret
 
 
 def get_all_files(file_name, dir_path):
@@ -54,14 +75,13 @@ def clone_repo(repo_name, temp_dir):
     try:
         write_msg('=> Cloning "{}" from "{}"'.format(repo_name, repo_url))
         command = ['git', 'clone', repo_url, target_dir]
-        ret, stdout, stderr = exec_command(command)
+        ret, stdout, stderr = exec_command(command, timeout=30)
         if not ret:
             write_error('command failed: {}'.format(' '.join(command)))
             return False
+        return True
     except subprocess.TimeoutExpired:
         write_error('command timed out: {}'.format(' '.join(command)))
-        return False
     except Exception as ex:
         write_error('command got an exception: {}'.format(' '.join(command)))
-        return False
-    return True
+    return False
