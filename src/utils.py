@@ -1,7 +1,10 @@
+import consts
 from os import listdir
 from os.path import isdir, isfile, join
 import subprocess
 import sys
+# pip3 install requests
+import requests
 
 
 def write_error(error_msg):
@@ -57,20 +60,8 @@ def exec_command_and_print_error(command, timeout=None):
     return ret
 
 
-def get_all_files(file_name, dir_path):
-    entries = [f for f in listdir(dir_path)]
-    ret = []
-    for entry in entries:
-        full_entry = join(dir_path, entry)
-        if isfile(full_entry) and entry == file_name:
-            ret.append(full_entry)
-        elif isdir(full_entry) and not entry.startswith('.'):
-            ret.extend(get_all_files(file_name, full_entry))
-    return ret
-
-
 def clone_repo(repo_name, temp_dir):
-    repo_url = '{}/{}/{}'.format(GITHUB_URL, ORGANIZATION, crate)
+    repo_url = '{}/{}/{}'.format(consts.GITHUB_URL, consts.ORGANIZATION, crate)
     target_dir = join(temp_dir, repo_name)
     try:
         write_msg('=> Cloning "{}" from "{}"'.format(repo_name, repo_url))
@@ -85,3 +76,31 @@ def clone_repo(repo_name, temp_dir):
     except Exception as ex:
         write_error('command got an exception: {}'.format(' '.join(command)))
     return False
+
+
+def create_headers(token):
+    headers = {
+        'User-Agent': 'gtk-rs',
+        'Accept': 'application/vnd.github.v3+json',
+    }
+    if token is not None:
+        # Authentication to github.
+        headers['Authorization'] = 'token {}'.format(token)
+    return headers
+
+
+def post_content(url, token, details, method='post', header_extras={}):
+    headers = create_headers(token)
+    for extra in header_extras:
+        headers[extra] = header_extras[extra]
+    try:
+        r = None
+        if method == 'post':
+            r = requests.post(url, data=json.dumps(details), headers=headers)
+        else:
+            r = requests.put(url, data=json.dumps(details), headers=headers)
+        r.raise_for_status()
+        return r.json()
+    except Exception as e:
+        write_error('post_content: An error occurred: {}'.format(e))
+    return None
