@@ -1,6 +1,8 @@
 #!/bin/python3
 
 from contextlib import contextmanager
+from datetime.datetime import fromtimestamp
+from github import Github
 from os.path import join
 from my_toml import TomlHandler
 from utils import clone_repo, exec_command, get_file_content, post_content, write_error
@@ -8,6 +10,7 @@ from utils import write_into_file, write_msg
 import consts
 import errno
 import getopt
+import time
 import shutil
 import subprocess
 import sys
@@ -184,7 +187,7 @@ def publish_crate(repository, crate_dir_path, temp_dir):
     path = join(join(temp_dir, repository), crate_dir_path)
     command = ['bash', '-c', 'cd {} && cargo publish'.format(path)]
     if not exec_command_and_print_error(command):
-        input("Smething bad happened! Try to fix it and then press ENTER to continue...")
+        input("Something bad happened! Try to fix it and then press ENTER to continue...")
 
 
 def create_pull_request(repo_name, from_branch, target_branch, token):
@@ -223,6 +226,58 @@ def update_badges(repo_name, temp_dir):
     return write_into_file(path, ''.join(out))
 
 
+def build_blog_post(repositories, temp_dir, token):
+    content = '''---
+layout: post
+author: {}
+title: {}
+categories: [front, crates]
+date: {}
+---
+
+* Write intro here *
+
+### Changes
+
+For the interested ones, here is the list of the (major) changes:
+
+'''.format(input('Enter author name: '), input('Enter title: '),
+           time.strftime("%Y-%m-%d %H:00:00 +0000"))
+    contributors = []
+    git = Github(token)
+    for repo in repositories:
+        prs = []
+        checkout_target_branch(repo, temp_dir, "crate")
+        success, out, err = exec_command(['git', 'log', '--format=%at', '--no-merges', '-n', '1'])
+        if not success:
+            write_msg("Couldn't get PRs for '{}': {}".format(repo, err))
+            continue
+        max_date = fromtimestamp(int(out))
+        write_msg("Gettings merged PRs from {}...".format(repo))
+        merged_prs = git.get_pulls('rust', 'rust-lang', 'closed', max_date, only_merged=True)
+        if len(merged_prs) < 1:
+            continue
+        repo_url = '{}/{}/{}'.format(consts.GITHUB_URL, consts.ORGANIZATION, repo)
+        content += '[{}]({}):\n\n'.format(repo, repo_url)
+        for pr in merged_prs:
+            if pr.author not in contributors:
+                contributors.append(pr.author)
+            content += ' * [{}]({}/pull/{})\n'.format(pr.title, repo_url, pr.number)
+        content += '\n'
+    content += 'Thanks to all of our contributors for their (awesome!) work for this release:\n\n'
+    content += '\n'.join([' * [@{}]({}/{})'.format(contributor, GITHUB_URL, contributor)])
+    content += '\n'
+
+    file_name = '{}-new-release.md'.format(time.strftime("%Y-%m-%d"))
+    try:
+        with open(file_name) as outfile:
+            outfile.write(content)
+            write_msg('New blog post written in "{}".'.format(file_name))
+    except Exception as e:
+        write_error('build_blog_post failed: {}'.format(e))
+        write_msg('\n=> Here is the blog post content:\n{}<='.format(content))
+
+
 def start(update_type, token):
     write_msg('Creating temporary directory...')
     with TemporaryDirectory() as temp_dir:
@@ -235,6 +290,7 @@ def start(update_type, token):
                 write_error('Cannot clone the "{}" repository...'.format(crate["repository"]))
                 return
         write_msg('Done!')
+
         write_msg('Updating crates version...')
         for crate in consts.CRATE_LIST:
             if update_crate_version(crate["repository"], crate["name"], crate["path"], temp_dir,
@@ -242,26 +298,37 @@ def start(update_type, token):
                 write_error('The update for the "{}" repository failed...'.format(crate["name"]))
                 return
         write_msg('Done!')
+
         write_msg('Committing and pushing to the "{}" branch...'.format(consts.MASTER_TMP_BRANCH))
         for repo in repositories:
             commit_and_push(repo, temp_dir, "Update versions", consts.MASTER_TMP_BRANCH)
         write_msg('Done!')
+
+        write_msg('Creating PRs on master branch...')
         for repo in repositories:
             create_pull_request(repo, consts.MASTER_TMP_BRANCH, "master")
+        write_msg('Done!')
+
         write_msg('Checking out "crate" branches')
         for repo in repositories:
             checkout_target_branch(repo, temp_dir, "crate")
         write_msg('Done!')
+
         write_msg('Merging "master" branches into "crate" branches...')
         for crate in repositories:
             merging_branches(repo, temp_dir, "master")
         write_msg('Done!')
+
         write_msg('Committing and pushing to the "{}" branch...'.format(consts.CRATE_TMP_BRANCH))
         for repo in repositories:
             commit_and_push(repo, temp_dir, "Update versions", consts.CRATE_TMP_BRANCH)
         write_msg('Done!')
+
+        write_msg('Creating PRs on crate branch...')
         for repo in repositories:
             create_pull_request(repo, consts.CRATE_TMP_BRANCH, "crate", token)
+        write_msg('Done!')
+
         write_msg('+++++++++++++++')
         write_msg('++ IMPORTANT ++')
         write_msg('+++++++++++++++')
@@ -272,10 +339,11 @@ def start(update_type, token):
         for repo in consts.CRATE_LIST:
             publish_crate(crate["repository"], crate["path"], temp_dir)
         write_msg('Done!')
-        # write_msg('Getting pull requests since last release to create the blog post...')
-        # TODO: Get all pull requests since the last release in order to create the blog post about
-        #       the release.
-        # write_msg('And done!')
+
+        write_msg('Building blog post...')
+        build_blog_post()
+        write_msg('Done!')
+
         write_msg('Updating docs...')
         if clone_repo(consts.DOC_REPO, temp_dir) is False:
             write_error('Cannot clone the "{}" repository...'.format(consts.DOC_REPO))
@@ -329,6 +397,7 @@ def main(argv):
         write_error('Missing update type argument.')
         sys.exit(5)
     start(mode, token)
+
 
 # Beginning of the script
 if __name__ != "__main__":
