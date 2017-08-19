@@ -1,7 +1,8 @@
 #!/bin/python3
 
 from contextlib import contextmanager
-from datetime.datetime import fromtimestamp
+# pip3 install datetime
+import datetime
 from github import Github
 from os.path import join
 from my_toml import TomlHandler
@@ -252,7 +253,7 @@ For the interested ones, here is the list of the (major) changes:
         if not success:
             write_msg("Couldn't get PRs for '{}': {}".format(repo, err))
             continue
-        max_date = fromtimestamp(int(out))
+        max_date = datetime.date.fromtimestamp(int(out))
         write_msg("Gettings merged PRs from {}...".format(repo))
         merged_prs = git.get_pulls('rust', 'rust-lang', 'closed', max_date, only_merged=True)
         if len(merged_prs) < 1:
@@ -281,82 +282,84 @@ For the interested ones, here is the list of the (major) changes:
 def start(update_type, token):
     write_msg('Creating temporary directory...')
     with TemporaryDirectory() as temp_dir:
-        write_msg('Cloning the repositories...')
+        write_msg('=> Cloning the repositories...')
         repositories = []
         for crate in consts.CRATE_LIST:
             if crate["repository"] not in repositories:
                 repositories.append(crate["repository"])
-            if clone_repo(crate["repository"], temp_dir) is False:
-                write_error('Cannot clone the "{}" repository...'.format(crate["repository"]))
-                return
+                if clone_repo(crate["repository"], temp_dir) is False:
+                    write_error('Cannot clone the "{}" repository...'.format(crate["repository"]))
+                    return
         write_msg('Done!')
 
-        write_msg('Updating crates version...')
+        write_msg('=> Updating crates version...')
         for crate in consts.CRATE_LIST:
-            if update_crate_version(crate["repository"], crate["name"], crate["path"], temp_dir,
+            if update_crate_version(crate["repository"], crate["crate"], crate["path"], temp_dir,
                                     update_type) is False:
-                write_error('The update for the "{}" repository failed...'.format(crate["name"]))
+                write_error('The update for the "{}" repository failed...'.format(crate["crate"]))
                 return
         write_msg('Done!')
 
-        write_msg('Committing and pushing to the "{}" branch...'.format(consts.MASTER_TMP_BRANCH))
-        for repo in repositories:
-            commit_and_push(repo, temp_dir, "Update versions", consts.MASTER_TMP_BRANCH)
-        write_msg('Done!')
+        # write_msg('=> Committing and pushing to the "{}" branch...'.format(consts.MASTER_TMP_BRANCH))
+        # for repo in repositories:
+        #     commit_and_push(repo, temp_dir, "Update versions", consts.MASTER_TMP_BRANCH)
+        # write_msg('Done!')
 
-        write_msg('Creating PRs on master branch...')
-        for repo in repositories:
-            create_pull_request(repo, consts.MASTER_TMP_BRANCH, "master")
-        write_msg('Done!')
+        # write_msg('=> Creating PRs on master branch...')
+        # for repo in repositories:
+        #     create_pull_request(repo, consts.MASTER_TMP_BRANCH, "master")
+        # write_msg('Done!')
 
-        write_msg('Checking out "crate" branches')
+        write_msg('=> Checking out "crate" branches')
         for repo in repositories:
             checkout_target_branch(repo, temp_dir, "crate")
         write_msg('Done!')
 
-        write_msg('Merging "master" branches into "crate" branches...')
+        write_msg('=> Merging "master" branches into "crate" branches...')
         for crate in repositories:
             merging_branches(repo, temp_dir, "master")
         write_msg('Done!')
 
-        write_msg('Committing and pushing to the "{}" branch...'.format(consts.CRATE_TMP_BRANCH))
-        for repo in repositories:
-            commit_and_push(repo, temp_dir, "Update versions", consts.CRATE_TMP_BRANCH)
-        write_msg('Done!')
+        # write_msg('=> Committing and pushing to the "{}" branch...'.format(consts.CRATE_TMP_BRANCH))
+        # for repo in repositories:
+        #     commit_and_push(repo, temp_dir, "Update versions", consts.CRATE_TMP_BRANCH)
+        # write_msg('Done!')
 
-        write_msg('Creating PRs on crate branch...')
-        for repo in repositories:
-            create_pull_request(repo, consts.CRATE_TMP_BRANCH, "crate", token)
-        write_msg('Done!')
+        # write_msg('=> Creating PRs on crate branch...')
+        # for repo in repositories:
+        #     create_pull_request(repo, consts.CRATE_TMP_BRANCH, "crate", token)
+        # write_msg('Done!')
 
-        write_msg('+++++++++++++++')
-        write_msg('++ IMPORTANT ++')
-        write_msg('+++++++++++++++')
-        write_msg('Almost everything has been done. Take a deep breath, check for opened pull '
-                  'requests and once done, we can move forward!')
-        input('Press ENTER to continue...')
-        write_msg('Publishing crates...')
-        for repo in consts.CRATE_LIST:
-            publish_crate(crate["repository"], crate["path"], temp_dir)
-        write_msg('Done!')
+        # write_msg('+++++++++++++++')
+        # write_msg('++ IMPORTANT ++')
+        # write_msg('+++++++++++++++')
+        # write_msg('Almost everything has been done. Take a deep breath, check for opened pull '
+        #           'requests and once done, we can move forward!')
+        # input('Press ENTER to continue...')
+        # write_msg('=> Publishing crates...')
+        # for repo in consts.CRATE_LIST:
+        #     publish_crate(crate["crate"], crate["path"], temp_dir)
+        # write_msg('Done!')
 
-        write_msg('Building blog post...')
+        write_msg('=> Building blog post...')
         build_blog_post()
         write_msg('Done!')
 
-        write_msg('Updating docs...')
-        if clone_repo(consts.DOC_REPO, temp_dir) is False:
-            write_error('Cannot clone the "{}" repository...'.format(consts.DOC_REPO))
-        else:
-            if update_badges(consts.DOC_REPO, temp_dir) is False:
-                write_error("Error when trying to update badges...")
-            else:
-                commit_and_push(consts.DOC_REPO, temp_dir, "Update versions",
-                                consts.MASTER_TMP_BRANCH)
-                create_pull_request(consts.DOC_REPO, consts.MASTER_TMP_BRANCH, "master", token)
-        write_msg('Seems like most things are done! Now remains:')
-        write_msg(" * Generate docs for all crates (don't forget to enable features!).")
-        write_msg(" * Write blog post.")
+        # write_msg('=> Updating docs...')
+        # if clone_repo(consts.DOC_REPO, temp_dir) is False:
+        #     write_error('Cannot clone the "{}" repository...'.format(consts.DOC_REPO))
+        # else:
+        #     if update_badges(consts.DOC_REPO, temp_dir) is False:
+        #         write_error("Error when trying to update badges...")
+        #     else:
+        #         commit_and_push(consts.DOC_REPO, temp_dir, "Update versions",
+        #                         consts.MASTER_TMP_BRANCH)
+        #         create_pull_request(consts.DOC_REPO, consts.MASTER_TMP_BRANCH, "master", token)
+        #         write_msg('Done!')
+        # write_msg('=================')
+        # write_msg('Seems like most things are done! Now remains:')
+        # write_msg(" * Check generated docs for all crates (don't forget to enable features!).")
+        # write_msg(" * Push blog post.")
         input('Press ENTER to leave (once done, the temporary directory "{}" will be destroyed)'
               .format(temp_dir))
 

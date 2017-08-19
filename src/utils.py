@@ -61,14 +61,14 @@ def exec_command_and_print_error(command, timeout=None):
 
 
 def clone_repo(repo_name, temp_dir):
-    repo_url = '{}/{}/{}'.format(consts.GITHUB_URL, consts.ORGANIZATION, crate)
+    repo_url = '{}/{}/{}'.format(consts.GITHUB_URL, consts.ORGANIZATION, repo_name)
     target_dir = join(temp_dir, repo_name)
     try:
         write_msg('=> Cloning "{}" from "{}"'.format(repo_name, repo_url))
         command = ['git', 'clone', repo_url, target_dir]
         ret, stdout, stderr = exec_command(command, timeout=30)
         if not ret:
-            write_error('command failed: {}'.format(' '.join(command)))
+            write_error('command "{}" failed: {}'.format(' '.join(command), stderr))
             return False
         return True
     except subprocess.TimeoutExpired:
