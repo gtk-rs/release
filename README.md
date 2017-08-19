@@ -12,3 +12,11 @@ Since gtk-rs has multiple crates which have inter-dependencies, it's a bit painf
  * Write a blog post (add the file into `_posts` folder in `gtk-rs.github.io` repository) announcing the new release.
 
 NOTE: Pull requests on the `crate` branch aren't build.
+
+## Using this tool
+
+I don't recommend it if you're not a member of the `gtk-rs` organization but just in case:
+
+```bash
+python3 src/release.py -m MEDIUM -t [Your github token here]
+```
