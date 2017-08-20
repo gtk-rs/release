@@ -15,7 +15,7 @@ class Section:
         if len(entry) > 0:
             elems = entry.split('=')
             key = elems[0].strip()
-            elems = '='.join(elems[1:]).strip
+            elems = '='.join(elems[1:]).strip()
             self.entries[key] = elems
 
     def __str__(self):

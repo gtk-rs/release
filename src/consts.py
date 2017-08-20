@@ -5,7 +5,9 @@ ORGANIZATION = "gtk-rs"
 MASTER_TMP_BRANCH = "master-release-update"
 CRATE_TMP_BRANCH = "crate-release-update"
 
-DOC_REPO = "gtk-rs.github.io"
+BLOG_REPO = "gtk-rs.github.io"
+DOC_REPO = "docs"
+DOC_REPO_BRANCH = "gh-pages"
 
 CRATE_LIST = [
     { "crate": "glib-sys",       "repository": "sys",        "path": "glib-sys" },
@@ -21,7 +23,6 @@ CRATE_LIST = [
     { "crate": "glib",           "repository": "glib",       "path": "" },
     { "crate": "gio",            "repository": "gio",        "path": "" },
     { "crate": "pango",          "repository": "pango",      "path": "" },
-    { "crate": "glib",           "repository": "glib",       "path": "" },
     { "crate": "cairo-rs",       "repository": "cairo",      "path": "" },
     { "crate": "gdk-pixbuf",     "repository": "gdk-pixbuf", "path": "" },
     { "crate": "gdk",            "repository": "gdk",        "path": "" },

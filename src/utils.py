@@ -1,6 +1,8 @@
 import consts
 from os import listdir
 from os.path import isdir, isfile, join
+from my_toml import TomlHandler
+import json
 import subprocess
 import sys
 # pip3 install requests
@@ -60,12 +62,14 @@ def exec_command_and_print_error(command, timeout=None):
     return ret
 
 
-def clone_repo(repo_name, temp_dir):
+def clone_repo(repo_name, temp_dir, depth=None):
     repo_url = '{}/{}/{}'.format(consts.GITHUB_URL, consts.ORGANIZATION, repo_name)
     target_dir = join(temp_dir, repo_name)
     try:
         write_msg('=> Cloning "{}" from "{}"'.format(repo_name, repo_url))
         command = ['git', 'clone', repo_url, target_dir]
+        if depth is not None:
+            command = ['git', 'clone', '--depth', '{}'.format(depth), repo_url, target_dir]
         ret, stdout, stderr = exec_command(command, timeout=30)
         if not ret:
             write_error('command "{}" failed: {}'.format(' '.join(command), stderr))
@@ -99,8 +103,60 @@ def post_content(url, token, details, method='post', header_extras={}):
             r = requests.post(url, data=json.dumps(details), headers=headers)
         else:
             r = requests.put(url, data=json.dumps(details), headers=headers)
-        r.raise_for_status()
+        try:
+            r.raise_for_status()
+        except:
+            print('Sent by bithub api: {}'.format(r.json()))
+            r.raise_for_status()
         return r.json()
     except Exception as e:
         write_error('post_content: An error occurred: {}'.format(e))
     return None
+
+
+def get_highest_feature_version(v1, v2):
+    t_v1 = v1[1:].split('_')
+    t_v2 = v2[1:].split('_')
+    i = 0
+    while i < len(t_v1) and i < len(t_v2):
+        try:
+            x1 = int(t_v1[i])
+            x2 = int(t_v2[i])
+            if x1 > x2:
+                return v1
+            elif x1 < x2:
+                return v2
+            i += 1
+        except:
+            write_error('get_highest_feature_version int conversion error: int("{}") vs int("{}")'
+                        ' from "{}" and "{}"'.format(t_v1[i], t_v2[i], v1, v2))
+            break
+    return v1
+
+
+# This function does two things:
+#
+# 1. Getting the highest version feature
+# 2. Getting all the other features (for cairo it's very important)
+def get_features(path):
+    features = []
+    highest_version = None
+    content = get_file_content(path)
+    if content is None:
+        return ''
+    toml = TomlHandler(content)
+    for section in toml.sections:
+        if section.name == 'features':
+            for entry in section.entries:
+                if entry in ['purge-lgpl-docs', 'embed-lgpl-docs', 'default']:
+                    continue
+                if entry.startswith('v'):
+                    if highest_version is None:
+                        highest_version = entry
+                    else:
+                        highest_version = get_highest_feature_version(highest_version, entry)
+                else:
+                    features.append(entry)
+    if highest_version is not None:
+        features.append(highest_version)
+    return ' '.join(features)
