@@ -148,7 +148,7 @@ def get_features(path):
     for section in toml.sections:
         if section.name == 'features':
             for entry in section.entries:
-                if entry in ['purge-lgpl-docs', 'embed-lgpl-docs', 'default']:
+                if entry in ['purge-lgpl-docs', 'default']:
                     continue
                 if entry.startswith('v'):
                     if highest_version is None:

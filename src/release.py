@@ -558,7 +558,7 @@ def main(argv):
     if token is None:
         write_error('Missing token argument.')
         sys.exit(4)
-    if mode is None:
+    if mode is None and doc_only is False:
         write_error('Missing update type argument.')
         sys.exit(5)
     start(mode, token, no_push, doc_only)
