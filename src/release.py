@@ -5,7 +5,7 @@ from contextlib import contextmanager
 import datetime
 from github import Github
 from os import listdir
-from os.path import isdir, join
+from os.path import isdir, isfile, join
 from my_toml import TomlHandler
 from utils import clone_repo, exec_command, exec_command_and_print_error, get_features
 from utils import get_file_content, post_content, write_error, write_into_file, write_msg
@@ -301,15 +301,30 @@ def build_docs(repo_name, temp_dir):
     path = join(temp_dir, repo_name)
     features = get_features(join(path, 'Cargo.toml'))
     command = ['bash', '-c',
-               'cd {} && cargo doc --no-default-features --no-deps --features "{}"'
+               'cd {} && cargo doc --no-default-features --features "{}"'
                .format(path, features)]
     if not exec_command_and_print_error(command):
         input("Couldn't generate docs! Try to fix it and then press ENTER to continue...")
-    command = ['bash', '-c', 'cd {} && cp -r * {}'.format(join(path, 'target/doc'),
-                                                          join(temp_dir, consts.DOC_REPO))]
+    doc_folder = join(path, 'target/doc')
+    command = ['bash', '-c',
+               'cd {} && cp -r "{}" src/{} {} "{}"'
+               .format(doc_folder,
+                       repo_name.replace('-', '_'),
+                       repo_name.replace('-', '_'),
+                       ' '.join(['"{}"'.format(f) for f in listdir(doc_folder)
+                                 if isfile(join(doc_folder, f))]),
+                       join(temp_dir, consts.DOC_REPO))]
     if not exec_command_and_print_error(command):
         input("Couldn't copy docs! Try to fix it and then press ENTER to continue...")
-    SEARCH_INDEX.append(get_file_content(join(path, 'target/doc/search-index.js')).split('\n')[1])
+    lines = get_file_content(join(path, 'target/doc/search-index.js')).split('\n')[1:]
+    for line in lines:
+        # We need to be careful in here if we're in a sys repository (which should never be the
+        # case!).
+        if line.startswith('searchIndex["{}"]'.format(repo_name.replace('-', '_'))):
+            SEARCH_INDEX.append(line)
+            return
+    input("Couldn't find \"{}\" in `searchIndex.js`! Try to fix it and then press ENTER to \
+          continue...".format(repo_name.replace('-', '_')))
 
 
 def end_docs_build(temp_dir):
