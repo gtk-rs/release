@@ -115,7 +115,7 @@ def find_crate(crate_name):
     return False
 
 
-def update_crate_version(repo_name, crate_name, crate_dir_path, temp_dir):
+def update_crate_version(repo_name, crate_name, crate_dir_path, temp_dir, specified_crate):
     file = join(join(join(temp_dir, repo_name), crate_dir_path), "Cargo.toml")
     output = file.replace(temp_dir, "")
     if output.startswith('/'):
@@ -128,13 +128,19 @@ def update_crate_version(repo_name, crate_name, crate_dir_path, temp_dir):
     versions_update = []
     for section in toml.sections:
         if section.name == 'package':
-            section.entries['version'] = CRATES_VERSION[crate_name]
+            section.set('version', CRATES_VERSION[crate_name])
+        elif specified_crate is not None:
+            continue
         elif section.name.startswith('dependencies.') and find_crate(section.name[13:]):
-            section.entries['version'] = CRATES_VERSION[section.name[13:]]
+            if specified_crate is None and section.name[13:] not in CRATES_VERSION:
+                input('"{}" dependency not found in versions for crate "{}"...'
+                      .format(section.name[13:], crate_name))
+                continue
+            section.set('version', CRATES_VERSION[section.name[13:]])
         elif section.name == 'dependencies':
             for entry in section.entries:
-                if find_crate(entry):
-                    section.entries[entry] = CRATES_VERSION[entry]
+                if find_crate(entry['key']):
+                    section.set(entry['key'], CRATES_VERSION[entry['key']])
     result = write_into_file(file, "{}\n".format(toml))
     write_msg('=> {}: {}'.format(output.split('/')[-2],
                                  'Failure' if result is False else 'Success'))
@@ -155,7 +161,7 @@ def update_repo_version(repo_name, crate_name, crate_dir_path, temp_dir, update_
     for section in toml.sections:
         if (section.name == 'package' or
                 (section.name.startswith('dependencies.') and find_crate(section.name[13:]))):
-            version = section.entries.get('version', None)
+            version = section.get('version', None)
             if version is None:
                 continue
             new_version = update_version(version, update_type, section.name)
@@ -169,14 +175,14 @@ def update_repo_version(repo_name, crate_name, crate_dir_path, temp_dir, update_
                 versions_update.append({'dependency_name': section.name[13:],
                                         'old_version': version,
                                         'new_version': new_version})
-            section.entries['version'] = new_version
+            section.set('version', new_version)
         elif section.name == 'dependencies':
             for entry in section.entries:
                 if find_crate(entry):
                     new_version = check_and_update_version(section.entries[entry],
                                                            update_type,
                                                            entry)
-                    section.entries[entry] = new_version
+                    section.set(entry, new_version)
     for up in versions_update:
         write_msg('\t{}: {} => {}'.format(up['dependency_name'], up['old_version'],
                                           up['new_version']))
@@ -270,7 +276,7 @@ def create_pull_request(repo_name, from_branch, target_branch, token):
         PULL_REQUESTS.append('> {}'.format(r['html_url']))
 
 
-def update_badges(repo_name, temp_dir):
+def update_badges(repo_name, temp_dir, specified_crate):
     path = join(join(temp_dir, repo_name), "_data/crates.json")
     content = get_file_content(path)
     current = None
@@ -278,6 +284,8 @@ def update_badges(repo_name, temp_dir):
     for line in content.split("\n"):
         if line.strip().startswith('"name": "'):
             current = line.split('"name": "')[-1].replace('",', '')
+            if specified_crate is not None and current != specified_crate:
+                current = None
         elif line.strip().startswith('"max_version": "') and current is not None:
             version = line.split('"max_version": "')[-1].replace('",', '')
             out.append(line.replace('": "{}",'.format(version),
@@ -306,13 +314,19 @@ def build_docs(repo_name, temp_dir):
     if not exec_command_and_print_error(command):
         input("Couldn't generate docs! Try to fix it and then press ENTER to continue...")
     doc_folder = join(path, 'target/doc')
+    try:
+        file_list = ' '.join(['"{}"'.format(f) for f in listdir(doc_folder)
+                              if isfile(join(doc_folder, f))])
+    except Exception as e:
+        write_error('Error occured in build docs: {}'.format(e))
+        input("It seems like the \"{}\" folder doesn't exist. Try to fix it then press ENTER..."
+              .format(doc_folder))
     command = ['bash', '-c',
                'cd {} && cp -r "{}" src/{} {} "{}"'
                .format(doc_folder,
                        repo_name.replace('-', '_'),
                        repo_name.replace('-', '_'),
-                       ' '.join(['"{}"'.format(f) for f in listdir(doc_folder)
-                                 if isfile(join(doc_folder, f))]),
+                       file_list,
                        join(temp_dir, consts.DOC_REPO))]
     if not exec_command_and_print_error(command):
         input("Couldn't copy docs! Try to fix it and then press ENTER to continue...")
@@ -393,28 +407,35 @@ For the interested ones, here is the list of the (major) changes:
         write_msg('\n=> Here is the blog post content:\n{}\n<='.format(content))
 
 
-def start(update_type, token, no_push, doc_only):
+def start(update_type, token, no_push, doc_only, specified_crate):
     write_msg('Creating temporary directory...')
     with TemporaryDirectory() as temp_dir:
         write_msg('=> Cloning the repositories...')
+        repositories = []
+        for crate in consts.CRATE_LIST:
+            if specified_crate is not None and crate['crate'] != specified_crate:
+                continue
+            if crate["repository"] not in repositories:
+                repositories.append(crate["repository"])
+                if clone_repo(crate["repository"], temp_dir) is False:
+                    write_error('Cannot clone the "{}" repository...'.format(crate["repository"]))
+                    return
+        if len(repositories) < 1:
+            write_msg('No crate "{}" found. Aborting...'.format(specified_crate))
+            return
         if clone_repo(consts.BLOG_REPO, temp_dir, depth=1) is False:
             write_error('Cannot clone the "{}" repository...'.format(consts.BLOG_REPO))
             return
         if clone_repo(consts.DOC_REPO, temp_dir, depth=1) is False:
             write_error('Cannot clone the "{}" repository...'.format(consts.DOC_REPO))
             return
-        repositories = []
-        for crate in consts.CRATE_LIST:
-            if crate["repository"] not in repositories:
-                repositories.append(crate["repository"])
-                if clone_repo(crate["repository"], temp_dir) is False:
-                    write_error('Cannot clone the "{}" repository...'.format(crate["repository"]))
-                    return
         write_msg('Done!')
 
         if doc_only is False:
             write_msg('=> Updating [master] crates version...')
             for crate in consts.CRATE_LIST:
+                if specified_crate is not None and crate['crate'] != specified_crate:
+                    continue
                 if update_repo_version(crate["repository"], crate["crate"], crate["path"],
                                        temp_dir, update_type) is False:
                     write_error('The update for the "{}" crate failed...'.format(crate["crate"]))
@@ -453,8 +474,10 @@ def start(update_type, token, no_push, doc_only):
 
             write_msg('=> Updating [crate] crates version...')
             for crate in consts.CRATE_LIST:
+                if specified_crate is not None and crate['crate'] != specified_crate:
+                    continue
                 if update_crate_version(crate["repository"], crate["crate"], crate["path"],
-                                        temp_dir) is False:
+                                        temp_dir, specified_crate) is False:
                     write_error('The update for the "{}" crate failed...'.format(crate["crate"]))
                     return
             write_msg('Done!')
@@ -484,6 +507,8 @@ def start(update_type, token, no_push, doc_only):
                 input('Press ENTER to continue...')
                 write_msg('=> Publishing crates...')
                 for crate in consts.CRATE_LIST:
+                    if specified_crate is not None and crate['crate'] != specified_crate:
+                        continue
                     publish_crate(crate["repository"], crate["path"], temp_dir)
                     write_msg('> crate {} has been published'.format(crate['crate']))
                 write_msg('Done!')
@@ -513,7 +538,7 @@ def start(update_type, token, no_push, doc_only):
 
         if doc_only is False:
             write_msg('=> Updating blog...')
-            if update_badges(consts.BLOG_REPO, temp_dir) is False:
+            if update_badges(consts.BLOG_REPO, temp_dir, specified_crate) is False:
                 write_error("Error when trying to update badges...")
             elif no_push is False:
                 commit_and_push(consts.BLOG_REPO, temp_dir, "Update versions",
@@ -535,13 +560,15 @@ def write_help():
     write_msg(" * -m <mode> | --mode=<mode>    : give the update type (MINOR|MEDIUM|MAJOR)")
     write_msg(" * --no-push                    : performs all operations but doesn't push anything")
     write_msg(" * --doc-only                   : only builds documentation")
+    write_msg(" * -c <crate> | --crate=<crate> : only update the given crate (for test purpose \
+               mainly)")
 
 
 def main(argv):
     try:
         opts, args = getopt.getopt(argv,
-                                   "ht:m:",
-                                   ["help", "token=", "mode=", "no-push", "doc-only"])
+                                   "ht:m:c:",
+                                   ["help", "token=", "mode=", "no-push", "doc-only", "crate"])
     except getopt.GetoptError:
         write_help()
         sys.exit(2)
@@ -550,6 +577,7 @@ def main(argv):
     mode = None
     no_push = False
     doc_only = False
+    specified_crate = None
     for opt, arg in opts:
         if opt in ('-h', '--help'):
             write_help()
@@ -566,6 +594,8 @@ def main(argv):
             no_push = True
         elif opt in ("--doc-only"):
             doc_only = True
+        elif opt in ('-c', '--crate'):
+            specified_crate = arg
         else:
             write_msg('"{}": unknown option'.format(opt))
             write_msg('Use "-h" or "--help" to see help')
@@ -576,7 +606,7 @@ def main(argv):
     if mode is None and doc_only is False:
         write_error('Missing update type argument.')
         sys.exit(5)
-    start(mode, token, no_push, doc_only)
+    start(mode, token, no_push, doc_only, specified_crate)
 
 
 # Beginning of the script
