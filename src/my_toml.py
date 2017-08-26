@@ -9,18 +9,31 @@ def create_section(content_line):
 class Section:
     def __init__(self, name):
         self.name = name
-        self.entries = {}
+        self.entries = []
 
     def add_entry(self, entry):
         if len(entry) > 0:
             elems = entry.split('=')
             key = elems[0].strip()
             elems = '='.join(elems[1:]).strip()
-            self.entries[key] = elems
+            self.set(key, elems)
+
+    def set(self, key, value):
+        for entry in self.entries:
+            if entry['key'] == key:
+                entry['value'] = value
+                return
+        self.entries.append({'key': key, 'value': value})
+
+    def get(self, key, default_value):
+        for entry in self.entries:
+            if entry['key'] == key:
+                return entry['value']
+        return default_value
 
     def __str__(self):
         return '[{}]\n{}'.format(self.name,
-                                 '\n'.join(['{} = {}'.format(x, self.entries[x])
+                                 '\n'.join(['{} = {}'.format(x['key'], x['value'])
                                             for x in self.entries]))
 
 

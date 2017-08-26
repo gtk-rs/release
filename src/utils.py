@@ -148,15 +148,15 @@ def get_features(path):
     for section in toml.sections:
         if section.name == 'features':
             for entry in section.entries:
-                if entry in ['purge-lgpl-docs', 'default']:
+                if entry['key'] in ['purge-lgpl-docs', 'default']:
                     continue
-                if entry.startswith('v'):
+                if entry['key'].startswith('v'):
                     if highest_version is None:
-                        highest_version = entry
+                        highest_version = entry['key']
                     else:
-                        highest_version = get_highest_feature_version(highest_version, entry)
+                        highest_version = get_highest_feature_version(highest_version, entry['key'])
                 else:
-                    features.append(entry)
+                    features.append(entry['key'])
     if highest_version is not None:
         features.append(highest_version)
     return ' '.join(features)
