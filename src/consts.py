@@ -20,6 +20,7 @@ CRATE_LIST = [
     { "crate": "gdk-sys",        "repository": "sys",        "path": "gdk-sys" },
     { "crate": "gtk-sys",        "repository": "sys",        "path": "gtk-sys" },
     { "crate": "gtk-source-sys", "repository": "sourceview", "path": "sourceview-sys" },
+    { "crate": "pangocairo-sys", "repository": "sys",        "path": "pangocairo-sys" },
     { "crate": "glib",           "repository": "glib",       "path": "" },
     { "crate": "gio",            "repository": "gio",        "path": "" },
     { "crate": "pango",          "repository": "pango",      "path": "" },
@@ -28,4 +29,5 @@ CRATE_LIST = [
     { "crate": "gdk",            "repository": "gdk",        "path": "" },
     { "crate": "gtk",            "repository": "gtk",        "path": "" },
     { "crate": "sourceview",     "repository": "sourceview", "path": "" },
+    { "crate": "pangocairo",     "repository": "pangocairo", "path": "" },
 ]
