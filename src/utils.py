@@ -136,7 +136,7 @@ def get_highest_feature_version(v1, v2):
 
 # This function does two things:
 #
-# 1. Getting the highest version feature
+# 1. Check if dox feature is present or try getting the highest version feature
 # 2. Getting all the other features (for cairo it's very important)
 def get_features(path):
     features = []
@@ -145,11 +145,14 @@ def get_features(path):
     if content is None:
         return ''
     toml = TomlHandler(content)
+    dox_present = False
     for section in toml.sections:
         if section.name == 'features':
             for entry in section.entries:
                 if entry['key'] in ['purge-lgpl-docs', 'default']:
                     continue
+                if entry['key'] == 'dox':
+                    dox_present = True
                 if entry['key'].startswith('v'):
                     if highest_version is None:
                         highest_version = entry['key']
@@ -157,6 +160,11 @@ def get_features(path):
                         highest_version = get_highest_feature_version(highest_version, entry['key'])
                 else:
                     features.append(entry['key'])
-    if highest_version is not None:
+    if dox_present is True:
+        features.append('dox')
+    elif highest_version is not None:
+        print("/!\\ Seems there is no dox feature so let's just use the highest version instead...")
         features.append(highest_version)
+    else:
+        print("/!\\ That's weird: no dox or version feature. Is everything fine with this one?")
     return ' '.join(features)
