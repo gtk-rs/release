@@ -44,7 +44,7 @@ def get_next_pages_url(link):
 def filter_data(content, to_return, max_date):
     total = 0
     if content.__class__.__name__ == 'dict':
-        return
+        return 0
     for pr in content:
         if 'closed_at' in pr and pr['closed_at'] is not None:
             if compare_dates(pr['closed_at'], max_date):
@@ -54,19 +54,11 @@ def filter_data(content, to_return, max_date):
             if compare_dates(pr['updated_at'], max_date):
                 to_return.append(pr)
                 total += 1
+    return total
 
-# This function tries to get as much github data as possible by running
-# "parallel" requests.
-def get_all_contents(url, state, max_date, token=None, recursive=True):
-    headers = {
-        'User-Agent': 'GuillaumeGomez',
-        'Accept': 'application/vnd.github.v3+json',
-    }
-    params = {'sort': 'updated', 'state': state, 'per_page': 100,
-              'direction': 'desc'}
-    if token is not None:
-        # Authentication to github.
-        headers['Authorization'] = 'token %s' % token
+
+
+def get_url_data(url, headers, params):
     res = requests.get(url, headers=headers, params=params)
     if res.status_code != 200:
         if res.status_code == 403:
@@ -83,38 +75,62 @@ def get_all_contents(url, state, max_date, token=None, recursive=True):
                                  res.headers['X-RateLimit-Reset']))
         raise Exception("Get request failed: '%s', got: [%s]: %s"
                         % (url, res.status_code, str(res.content)))
+    return res
+
+
+# This function tries to get as much github data as possible by running
+# "parallel" requests.
+def get_all_contents(url, state=None, max_date=None, token=None, recursive=True, params={}):
+    headers = {
+        'User-Agent': 'GuillaumeGomez',
+        'Accept': 'application/vnd.github.v3+json',
+    }
+    params['per_page'] = 100
+    if state is not None:
+        params['sort'] = 'updated'
+        params['state'] = state
+        params['direction'] = 'desc'
+    if token is not None:
+        # Authentication to github.
+        headers['Authorization'] = 'token %s' % token
+    res = get_url_data(url, headers, params)
     content = res.json()
     to_return = []
-    filter_data(content, to_return, max_date)
+    if max_date is not None:
+        if filter_data(content, to_return, max_date) < 100:
+            return to_return
+    else:
+        for x in content:
+            to_return.append(x)
     if 'Link' not in res.headers or not recursive:
         # If there are no other pages, we can return the current content.
-        if max_date is None:
-            return content
         return to_return
 
     h = res.headers['Link']
-    if h is None or len(h) != 1:
+    if h is None or len(h) < 1:
         return content
 
     next_page_url, last_page_url = get_next_pages_url(h)
     if len(last_page_url) < 10 or len(next_page_url) < 10:
-        return content
+        return to_return
     next_page = get_page_number(next_page_url)
     last_page = get_page_number(last_page_url)
-
-    urls = [next_page_url]
     to_replace = "page=%s" % next_page
-    next_page += 1
+
     while next_page <= last_page:
-        requests.get(next_page_url.replace("&%s" % to_replace,
-                                           "&page=%s" % next_page)
-                                  .replace("?%s" % to_replace,
-                                           "?page=%s" % next_page), headers=headers)
+        res = get_url_data(next_page_url.replace("&%s" % to_replace,
+                                                 "&page=%s" % next_page),
+                           headers,
+                           None)
         if res.status_code != 200:
             break
         content = res.json()
-        if filter_data(content, to_return, max_date) != len(content):
-            break
+        if max_date is not None:
+            if filter_data(content, to_return, max_date) < 100:
+                break
+        else:
+            for x in content:
+                to_return.append(x)
         next_page += 1
     return to_return
 
@@ -124,30 +140,49 @@ class Github:
         self.token = token
 
     def get_pull(self, repo_name, repo_owner, pull_number):
-        return Repository(self.token, repo_name, repo_owner).get_pull(pull_number)
+        return Repository(self, repo_name, repo_owner).get_pull(pull_number)
 
     def get_pulls(self, repo_name, repo_owner, state, max_date, only_merged=False):
-        return Repository(self.token,
+        return Repository(self,
                           repo_name,
                           repo_owner).get_pulls(state,
                                                 max_date,
                                                 only_merged=only_merged)
 
+    def get_organization(self, organization_name):
+        return Organization(self, organization_name)
+
+
+class Organization:
+    def __init__(self, gh_obj, name):
+        self.gh_obj = gh_obj
+        self.name = name
+
+    def get_repositories(self):
+        repos = get_all_contents('https://api.github.com/orgs/%s/repos'
+                                 % (self.name),
+                                 token=self.gh_obj.token)
+        if repos is None:
+            return []
+        return [Repository(self.gh_obj, repo['name'], repo['owner']['login'], repo['updated_at'])
+                for repo in repos]
+
 
 class Repository:
-    def __init__(self, token, name, owner):
+    def __init__(self, gh_obj, name, owner, last_updated):
         self.name = name
-        self.token = token
+        self.gh_obj = gh_obj
         self.owner = owner
+        self.last_updated = last_updated
 
     def get_pulls(self, state, max_date, only_merged=False):
         prs = get_all_contents('https://api.github.com/repos/%s/%s/pulls'
                                % (self.owner, self.name),
                                state, max_date,
-                               token=self.token)
+                               token=self.gh_obj.token)
         if prs is None:
             return []
-        return [PullRequest(self.token, self.name, self.owner,
+        return [PullRequest(self.gh_obj, self.name, self.owner,
                             pr['number'],
                             pr['base']['ref'], pr['head']['ref'],
                             pr['head']['sha'], pr['title'],
@@ -161,24 +196,48 @@ class Repository:
         pr = get_all_contents('https://api.github.com/repos/%s/%s/pulls/%s'
                               % (self.owner, self.name, pull_number),
                               'all', None,
-                              token=self.token)
+                              token=self.gh_obj.token)
         if pr is None:
             return None
-        return PullRequest(self.token, self.name, self.owner,
+        return PullRequest(self.gh_obj, self.name, self.owner,
                            pull_number,
                            pr['base']['ref'], pr['head']['ref'],
                            pr['head']['sha'], pr['title'],
                            pr['user']['login'], pr['state'],
                            pr['merged_at'], pr['closed_at'])
 
+    def get_commits(self, branch, since, until):
+        commits = get_all_contents(
+            'https://api.github.com/repos/%s/%s/commits'
+            % (self.owner, self.name),
+            token=self.gh_obj.token,
+            params={'sha': branch,
+                    'since': '{}-{:01d}-{:01d}T00:00:00Z'.format(since.year, since.month,
+                                                                 since.day),
+                    'until': '{}-{:01d}-{:01d}T00:00:00Z'.format(until.year, until.month,
+                                                                 until.day)})
+        if commits is None:
+            return []
+        return [Commit(x['commit']['author']['name'], x['commit']['committer']['name'],
+                       x['sha'], x['commit']['message'])
+                for x in commits]
+
+
+class Commit:
+    def __init__(self, author, committer, sha, message):
+        self.author = author
+        self.committer = committer
+        self.sha = sha
+        self.message = message
+
 
 # Represent a Github Pull Request.
 class PullRequest:
-    def __init__(self, token, repo_name, repo_owner,
+    def __init__(self, gh_obj, repo_name, repo_owner,
                  pull_number, target_branch, from_branch, head_commit,
                  title, author, open_state, merged_at, closed_at):
         self.repo_name = repo_name
-        self.token = token
+        self.gh_obj = gh_obj
         self.repo_owner = repo_owner
         self.number = pull_number
         self.target_branch = target_branch
