@@ -408,8 +408,9 @@ For the interested ones, here is the list of the (major) changes:
 
 
 def start(update_type, token, no_push, doc_only, specified_crate):
-    write_msg('Creating temporary directory...')
+    write_msg('=> Creating temporary directory...')
     with TemporaryDirectory() as temp_dir:
+        write_msg('Temporary directory created in "{}"'.format(temp_dir))
         write_msg('=> Cloning the repositories...')
         repositories = []
         for crate in consts.CRATE_LIST:
