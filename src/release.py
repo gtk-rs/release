@@ -385,6 +385,8 @@ For the interested ones, here is the list of the (major) changes:
         repo_url = '{}/{}/{}'.format(consts.GITHUB_URL, consts.ORGANIZATION, repo)
         content += '[{}]({}):\n\n'.format(repo, repo_url)
         for pr in merged_prs:
+            if pr.title.startswith('[release] '):
+                continue
             if pr.author not in contributors:
                 contributors.append(pr.author)
             content += ' * [{}]({}/pull/{})\n'.format(pr.title, repo_url, pr.number)
@@ -424,9 +426,10 @@ def start(update_type, token, no_push, doc_only, specified_crate):
         if len(repositories) < 1:
             write_msg('No crate "{}" found. Aborting...'.format(specified_crate))
             return
-        if clone_repo(consts.BLOG_REPO, temp_dir, depth=1) is False:
-            write_error('Cannot clone the "{}" repository...'.format(consts.BLOG_REPO))
-            return
+        if doc_only is False:
+            if clone_repo(consts.BLOG_REPO, temp_dir, depth=1) is False:
+                write_error('Cannot clone the "{}" repository...'.format(consts.BLOG_REPO))
+                return
         if clone_repo(consts.DOC_REPO, temp_dir, depth=1) is False:
             write_error('Cannot clone the "{}" repository...'.format(consts.DOC_REPO))
             return
