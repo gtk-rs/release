@@ -186,7 +186,10 @@ def update_repo_version(repo_name, crate_name, crate_dir_path, temp_dir, update_
     for up in versions_update:
         write_msg('\t{}: {} => {}'.format(up['dependency_name'], up['old_version'],
                                           up['new_version']))
-    result = write_into_file(file, "{}".format(toml))
+    out = "{}".format(toml)
+    if not out.endswith("\n"):
+        out += '\n'
+    result = write_into_file(file, out)
     write_msg('=> {}: {}'.format(output.split('/')[-2],
                                  'Failure' if result is False else 'Success'))
     return result
@@ -385,6 +388,8 @@ For the interested ones, here is the list of the (major) changes:
         repo_url = '{}/{}/{}'.format(consts.GITHUB_URL, consts.ORGANIZATION, repo)
         content += '[{}]({}):\n\n'.format(repo, repo_url)
         for pr in merged_prs:
+            if pr.title.startswith('[release] '):
+                continue
             if pr.author not in contributors:
                 contributors.append(pr.author)
             content += ' * [{}]({}/pull/{})\n'.format(pr.title, repo_url, pr.number)
@@ -408,8 +413,9 @@ For the interested ones, here is the list of the (major) changes:
 
 
 def start(update_type, token, no_push, doc_only, specified_crate):
-    write_msg('Creating temporary directory...')
+    write_msg('=> Creating temporary directory...')
     with TemporaryDirectory() as temp_dir:
+        write_msg('Temporary directory created in "{}"'.format(temp_dir))
         write_msg('=> Cloning the repositories...')
         repositories = []
         for crate in consts.CRATE_LIST:
@@ -423,9 +429,10 @@ def start(update_type, token, no_push, doc_only, specified_crate):
         if len(repositories) < 1:
             write_msg('No crate "{}" found. Aborting...'.format(specified_crate))
             return
-        if clone_repo(consts.BLOG_REPO, temp_dir, depth=1) is False:
-            write_error('Cannot clone the "{}" repository...'.format(consts.BLOG_REPO))
-            return
+        if doc_only is False:
+            if clone_repo(consts.BLOG_REPO, temp_dir, depth=1) is False:
+                write_error('Cannot clone the "{}" repository...'.format(consts.BLOG_REPO))
+                return
         if clone_repo(consts.DOC_REPO, temp_dir, depth=1) is False:
             write_error('Cannot clone the "{}" repository...'.format(consts.DOC_REPO))
             return
