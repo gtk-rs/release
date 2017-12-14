@@ -168,3 +168,15 @@ def get_features(path):
     else:
         print("/!\\ That's weird: no dox or version feature. Is everything fine with this one?")
     return ' '.join(features)
+
+def compare_versions(v1, v2):
+    v1 = v1.split('.')
+    v2 = v2.split('.')
+
+    for x in range(0, min(len(v1), len(v2))):
+        if v1 > v2:
+            return 1
+        if v1 < v2:
+            return -1
+    # In here, "3.2" is considered littler than "3.2.0". That's how life goes.
+    return len(v1) - len(v2)

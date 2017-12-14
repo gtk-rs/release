@@ -7,8 +7,9 @@ from github import Github
 from os import listdir
 from os.path import isdir, isfile, join
 from my_toml import TomlHandler
-from utils import clone_repo, exec_command, exec_command_and_print_error, get_features
-from utils import get_file_content, post_content, write_error, write_into_file, write_msg
+from utils import clone_repo, compare_versions, exec_command, exec_command_and_print_error
+from utils import get_features, get_file_content, post_content, write_error, write_into_file
+from utils import write_msg
 import consts
 import errno
 import getopt
@@ -252,6 +253,22 @@ def publish_crate(repository, crate_dir_path, temp_dir):
         input("Something bad happened! Try to fix it and then press ENTER to continue...")
 
 
+def create_tag_and_push(tag_name, repository, temp_dir):
+    path = join(temp_dir, repository)
+    command = ['bash', '-c', 'cd {} && git tag "{}" && git push origin "{}"'.format(path,
+                                                                                    tag_name,
+                                                                                    tag_name)]
+    if not exec_command_and_print_error(command):
+        input("Something bad happened! Try to fix it and then press ENTER to continue...")
+
+
+def push_tag(tag_name, repository, temp_dir):
+    path = join(temp_dir, repository)
+    command = ['bash', '-c', 'cd {} && git push origin "{}"'.format(path, tag_name)]
+    if not exec_command_and_print_error(command):
+        input("Something bad happened! Try to fix it and then press ENTER to continue...")
+
+
 def create_pull_request(repo_name, from_branch, target_branch, token):
     r = post_content('{}/repos/{}/{}/pulls'.format(consts.GH_API_URL, consts.ORGANIZATION,
                                                    repo_name),
@@ -412,6 +429,46 @@ For the interested ones, here is the list of the (major) changes:
         write_msg('\n=> Here is the blog post content:\n{}\n<='.format(content))
 
 
+def generate_new_tag(repository, temp_dir, specified_crate):
+    versions = {}
+    # In some repositories (like sys), there are more than one crates. In such case, we try to
+    # get the most common version number and then we create the tag from there.
+    #
+    # First, we get all versions.
+    for crate in CRATE_LIST:
+        if crate['repository'] == repository:
+            versions[crate['crate']] = CRATES_VERSION[crate['crate']]
+    if specified_crate is not None and specified_crate in versions and len(versions) > 0:
+        write_msg('Seems like "{}" is part of a repository with multiple crates so no \
+                   tag generation this time...'.format(specified_crate))
+        return
+
+    most_common = {}
+    # Now we get how many crates have this version.
+    for version in versions:
+        if versions[version] in most_common:
+            most_common[versions[version]] += 1
+        else:
+            most_common[versions[version]] = 1
+    version = None
+    # Now we get the "lowest" version that will be used as default tag name.
+    for common in most_common:
+        if version is None or compare_versions(common, version) < 0:
+            version = common
+    # And now we get the most common tag name.
+    for common in most_common:
+        if version is None or most_common[version] < most_common[common]:
+            version = common
+    if version is None:
+        write_error('Something impossible happened for "{}": no version can be tagged...'
+                    .format(repository))
+        input('If you think you can do better, go ahead! (In "{}".) Then press ENTER to continue'
+              .format(join(temp_dir, repository)))
+        return
+    write_msg('==> Creating new tag "{}" for repository "{}"...'.format(version, repository))
+    create_tag_and_push(version, repository, temp_dir)
+
+
 def start(update_type, token, no_push, doc_only, specified_crate):
     write_msg('=> Creating temporary directory...')
     with TemporaryDirectory() as temp_dir:
@@ -520,6 +577,11 @@ def start(update_type, token, no_push, doc_only, specified_crate):
                     write_msg('> crate {} has been published'.format(crate['crate']))
                 write_msg('Done!')
 
+                write_msg("=> Generating tags...")
+                for repo in repositories:
+                    generate_new_tag(repo, temp_dir, specified_crate)
+                write_msg('Done!')
+
         write_msg('=> Preparing doc repo (too much dark magic in here urg)...')
         cleanup_doc_repo(temp_dir)
         write_msg('Done!')
@@ -541,7 +603,6 @@ def start(update_type, token, no_push, doc_only, specified_crate):
             create_pull_request(consts.DOC_REPO, consts.CRATE_TMP_BRANCH, "gh-pages", token)
             write_msg("New pull request(s):\n\n{}\n".format('\n'.join(PULL_REQUESTS)))
         write_msg('Done!')
-
 
         if doc_only is False:
             write_msg('=> Updating blog...')
