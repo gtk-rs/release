@@ -431,6 +431,7 @@ For the interested ones, here is the list of the (major) changes:
 
 def generate_new_tag(repository, temp_dir, specified_crate):
     versions = {}
+    version = None
     # In some repositories (like sys), there are more than one crates. In such case, we try to
     # get the most common version number and then we create the tag from there.
     #
@@ -438,33 +439,36 @@ def generate_new_tag(repository, temp_dir, specified_crate):
     for crate in CRATE_LIST:
         if crate['repository'] == repository:
             versions[crate['crate']] = CRATES_VERSION[crate['crate']]
-    if specified_crate is not None and specified_crate in versions and len(versions) > 0:
+            if crate['crate'].endswith('-sys') or crate['crate'].endswith('-sys-rs'):
+                version = CRATES_VERSION[crate['crate']]
+    if specified_crate is not None and
+           (specified_crate.endswith('-sys') or specified_crate.endswith('-sys-rs')):
         write_msg('Seems like "{}" is part of a repository with multiple crates so no \
                    tag generation this time...'.format(specified_crate))
         return
 
-    most_common = {}
-    # Now we get how many crates have this version.
-    for version in versions:
-        if versions[version] in most_common:
-            most_common[versions[version]] += 1
-        else:
-            most_common[versions[version]] = 1
-    version = None
-    # Now we get the "lowest" version that will be used as default tag name.
-    for common in most_common:
-        if version is None or compare_versions(common, version) < 0:
-            version = common
-    # And now we get the most common tag name.
-    for common in most_common:
-        if version is None or most_common[version] < most_common[common]:
-            version = common
     if version is None:
-        write_error('Something impossible happened for "{}": no version can be tagged...'
-                    .format(repository))
-        input('If you think you can do better, go ahead! (In "{}".) Then press ENTER to continue'
-              .format(join(temp_dir, repository)))
-        return
+        most_common = {}
+        # Now we get how many crates have this version.
+        for version in versions:
+            if versions[version] in most_common:
+                most_common[versions[version]] += 1
+            else:
+                most_common[versions[version]] = 1
+        # Now we get the "lowest" version that will be used as default tag name.
+        for common in most_common:
+            if version is None or compare_versions(common, version) < 0:
+                version = common
+        # And now we get the most common tag name.
+        for common in most_common:
+            if version is None or most_common[version] < most_common[common]:
+                version = common
+        if version is None:
+            write_error('Something impossible happened for "{}": no version can be tagged...'
+                        .format(repository))
+            input('If you think you can do better, go ahead! (In "{}".) Then press ENTER to continue'
+                  .format(join(temp_dir, repository)))
+            return
     write_msg('==> Creating new tag "{}" for repository "{}"...'.format(version, repository))
     create_tag_and_push(version, repository, temp_dir)
 

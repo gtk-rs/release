@@ -174,9 +174,16 @@ def compare_versions(v1, v2):
     v2 = v2.split('.')
 
     for x in range(0, min(len(v1), len(v2))):
-        if v1 > v2:
+        try:
+            entry1 = int(v1)
+            entry2 = int(v2)
+        except:
+            # If it cannot be converted into a number, better just compare strings then.
+            entry1 = v1
+            entry2 = v2
+        if entry1 > entry2:
             return 1
-        if v1 < v2:
+        if entry1 < entry2:
             return -1
     # In here, "3.2" is considered littler than "3.2.0". That's how life goes.
     return len(v1) - len(v2)
