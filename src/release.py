@@ -148,7 +148,7 @@ def update_crate_version(repo_name, crate_name, crate_dir_path, temp_dir, specif
     return result
 
 
-def update_repo_version(repo_name, crate_name, crate_dir_path, temp_dir, update_type):
+def update_repo_version(repo_name, crate_name, crate_dir_path, temp_dir, update_type, badges_only):
     file = join(join(join(temp_dir, repo_name), crate_dir_path), "Cargo.toml")
     output = file.replace(temp_dir, "")
     if output.startswith('/'):
@@ -165,12 +165,16 @@ def update_repo_version(repo_name, crate_name, crate_dir_path, temp_dir, update_
             version = section.get('version', None)
             if version is None:
                 continue
-            new_version = update_version(version, update_type, section.name)
+            new_version = None
+            if badges_only is False:
+                new_version = update_version(new_version, update_type, section.name)
+            else:
+                new_version = version
             if new_version is None:
                 return False
             # Print the status directly if it's the crate's version.
             if section.name == 'package':
-                write_msg('{}: {} => {}'.format(output.split('/')[-2], version, new_version))
+                write_msg('\t{}: {} => {}'.format(output.split('/')[-2], version, new_version))
                 CRATES_VERSION[crate_name] = new_version
             else:  # Otherwise add it to the list to print later.
                 versions_update.append({'dependency_name': section.name[13:],
@@ -190,7 +194,10 @@ def update_repo_version(repo_name, crate_name, crate_dir_path, temp_dir, update_
     out = "{}".format(toml)
     if not out.endswith("\n"):
         out += '\n'
-    result = write_into_file(file, out)
+    result = True
+    if badges_only is False:
+        # We only write into the file if we're not just getting the crates version.
+        result = write_into_file(file, out)
     write_msg('=> {}: {}'.format(output.split('/')[-2],
                                  'Failure' if result is False else 'Success'))
     return result
@@ -307,9 +314,9 @@ def update_badges(repo_name, temp_dir, specified_crate):
             if specified_crate is not None and current != specified_crate:
                 current = None
         elif line.strip().startswith('"max_version": "') and current is not None:
-            version = line.split('"max_version": "')[-1].replace('",', '')
-            out.append(line.replace('": "{}",'.format(version),
-                                    '": "{}",'.format(CRATES_VERSION[current])) + '\n')
+            version = line.split('"max_version": "')[-1].replace('"', '').replace(',', '')
+            out.append(line.replace('": "{}"'.format(version),
+                                    '": {}'.format(CRATES_VERSION[current])) + '\n')
             current = None
             continue
         out.append(line + '\n')
@@ -469,7 +476,7 @@ def generate_new_tag(repository, temp_dir, specified_crate):
     create_tag_and_push(version, repository, temp_dir)
 
 
-def start(update_type, token, no_push, doc_only, specified_crate):
+def start(update_type, token, no_push, doc_only, specified_crate, badges_only):
     write_msg('=> Creating temporary directory...')
     with TemporaryDirectory() as temp_dir:
         write_msg('Temporary directory created in "{}"'.format(temp_dir))
@@ -501,36 +508,37 @@ def start(update_type, token, no_push, doc_only, specified_crate):
                 if specified_crate is not None and crate['crate'] != specified_crate:
                     continue
                 if update_repo_version(crate["repository"], crate["crate"], crate["path"],
-                                       temp_dir, update_type) is False:
+                                       temp_dir, update_type, badges_only) is False:
                     write_error('The update for the "{}" crate failed...'.format(crate["crate"]))
                     return
             write_msg('Done!')
 
-            write_msg('=> Committing{} to the "{}" branch...'
-                      .format(" and pushing" if no_push is False else "",
-                              consts.MASTER_TMP_BRANCH))
-            for repo in repositories:
-                commit(repo, temp_dir, "Update versions")
-                if no_push is False:
-                    push(repo, temp_dir, consts.MASTER_TMP_BRANCH)
-            write_msg('Done!')
-
-            if no_push is False:
-                write_msg('=> Creating PRs on master branch...')
+            if badges_only is False:
+                write_msg('=> Committing{} to the "{}" branch...'
+                          .format(" and pushing" if no_push is False else "",
+                                  consts.MASTER_TMP_BRANCH))
                 for repo in repositories:
-                    create_pull_request(repo, consts.MASTER_TMP_BRANCH, "master", token)
+                    commit(repo, temp_dir, "Update versions")
+                    if no_push is False:
+                        push(repo, temp_dir, consts.MASTER_TMP_BRANCH)
                 write_msg('Done!')
 
-            write_msg('=> Building blog post...')
-            build_blog_post(repositories, temp_dir, token)
-            write_msg('Done!')
+                if no_push is False:
+                    write_msg('=> Creating PRs on master branch...')
+                    for repo in repositories:
+                        create_pull_request(repo, consts.MASTER_TMP_BRANCH, "master", token)
+                    write_msg('Done!')
+
+                write_msg('=> Building blog post...')
+                build_blog_post(repositories, temp_dir, token)
+                write_msg('Done!')
 
         write_msg('=> Checking out "crate" branches')
         for repo in repositories:
             checkout_target_branch(repo, temp_dir, "crate")
         write_msg('Done!')
 
-        if doc_only is False:
+        if doc_only is False and badges_only is False:
             write_msg('=> Merging "master" branches into "crate" branches...')
             for repo in repositories:
                 merging_branches(repo, temp_dir, "master")
@@ -582,27 +590,28 @@ def start(update_type, token, no_push, doc_only, specified_crate):
                     generate_new_tag(repo, temp_dir, specified_crate)
                 write_msg('Done!')
 
-        write_msg('=> Preparing doc repo (too much dark magic in here urg)...')
-        cleanup_doc_repo(temp_dir)
-        write_msg('Done!')
+        if badges_only is False:
+            write_msg('=> Preparing doc repo (too much dark magic in here urg)...')
+            cleanup_doc_repo(temp_dir)
+            write_msg('Done!')
 
-        write_msg('=> Building docs...')
-        for repo in repositories:
-            if repo != "sys":  # Maybe we should generate docs for sys crates as well?
-                write_msg('-> Building docs for {}...'.format(repo))
-                build_docs(repo, temp_dir)
-        end_docs_build(temp_dir)
-        write_msg('Done!')
+            write_msg('=> Building docs...')
+            for repo in repositories:
+                if repo != "sys":  # Maybe we should generate docs for sys crates as well?
+                    write_msg('-> Building docs for {}...'.format(repo))
+                    build_docs(repo, temp_dir)
+            end_docs_build(temp_dir)
+            write_msg('Done!')
 
-        write_msg('=> Committing{} docs to the "{}" branch...'
-                  .format(" and pushing" if no_push is False else "",
-                          consts.CRATE_TMP_BRANCH))
-        commit(consts.DOC_REPO, temp_dir, "Regen docs")
-        if no_push is False:
-            push(consts.DOC_REPO, temp_dir, consts.CRATE_TMP_BRANCH)
-            create_pull_request(consts.DOC_REPO, consts.CRATE_TMP_BRANCH, "gh-pages", token)
-            write_msg("New pull request(s):\n\n{}\n".format('\n'.join(PULL_REQUESTS)))
-        write_msg('Done!')
+            write_msg('=> Committing{} docs to the "{}" branch...'
+                      .format(" and pushing" if no_push is False else "",
+                              consts.CRATE_TMP_BRANCH))
+            commit(consts.DOC_REPO, temp_dir, "Regen docs")
+            if no_push is False:
+                push(consts.DOC_REPO, temp_dir, consts.CRATE_TMP_BRANCH)
+                create_pull_request(consts.DOC_REPO, consts.CRATE_TMP_BRANCH, "gh-pages", token)
+                write_msg("New pull request(s):\n\n{}\n".format('\n'.join(PULL_REQUESTS)))
+            write_msg('Done!')
 
         if doc_only is False:
             write_msg('=> Updating blog...')
@@ -630,13 +639,15 @@ def write_help():
     write_msg(" * --doc-only                   : only builds documentation")
     write_msg(" * -c <crate> | --crate=<crate> : only update the given crate (for test purpose \
                mainly)")
+    write_msg(" * --badges-only                : only update the badges on the website")
 
 
 def main(argv):
     try:
         opts, args = getopt.getopt(argv,
                                    "ht:m:c:",
-                                   ["help", "token=", "mode=", "no-push", "doc-only", "crate"])
+                                   ["help", "token=", "mode=", "no-push", "doc-only", "crate",
+                                    "badges-only"])
     except getopt.GetoptError:
         write_help()
         sys.exit(2)
@@ -646,6 +657,7 @@ def main(argv):
     no_push = False
     doc_only = False
     specified_crate = None
+    badges_only = False
     for opt, arg in opts:
         if opt in ('-h', '--help'):
             write_help()
@@ -662,6 +674,8 @@ def main(argv):
             no_push = True
         elif opt in ("--doc-only"):
             doc_only = True
+        elif opt in ("--badges-only"):
+            badges_only = True
         elif opt in ('-c', '--crate'):
             specified_crate = arg
         else:
@@ -671,10 +685,10 @@ def main(argv):
     if token is None:
         write_error('Missing token argument.')
         sys.exit(4)
-    if mode is None and doc_only is False:
+    if mode is None and doc_only is False and badges_only is False:
         write_error('Missing update type argument.')
         sys.exit(5)
-    start(mode, token, no_push, doc_only, specified_crate)
+    start(mode, token, no_push, doc_only, specified_crate, badges_only)
 
 
 # Beginning of the script
