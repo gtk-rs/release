@@ -378,6 +378,17 @@ def end_docs_build(temp_dir):
     add_to_commit(consts.DOC_REPO, temp_dir, ['.'])
 
 
+def write_merged_prs(merged_prs):
+    content = ''
+    for pr in merged_prs:
+        if pr.title.startswith('[release] '):
+            continue
+        if pr.author not in contributors:
+            contributors.append(pr.author)
+        content += ' * [{}]({}/pull/{})\n'.format(pr.title, repo_url, pr.number)
+    return content + '\n'
+
+
 def build_blog_post(repositories, temp_dir, token):
     content = '''---
 layout: post
@@ -397,6 +408,7 @@ For the interested ones, here is the list of the (major) changes:
            time.strftime("%Y-%m-%d %H:00:00 +0000"))
     contributors = []
     git = Github(token)
+    oldest_date = None
     for repo in repositories:
         prs = []
         checkout_target_branch(repo, temp_dir, "crate")
@@ -405,19 +417,23 @@ For the interested ones, here is the list of the (major) changes:
             write_msg("Couldn't get PRs for '{}': {}".format(repo, err))
             continue
         max_date = datetime.date.fromtimestamp(int(out))
+        if oldest_date is None or max_date < oldest_date:
+            oldest_date = max_date
         write_msg("Gettings merged PRs from {}...".format(repo))
         merged_prs = git.get_pulls(repo, consts.ORGANIZATION, 'closed', max_date, only_merged=True)
         if len(merged_prs) < 1:
             continue
         repo_url = '{}/{}/{}'.format(consts.GITHUB_URL, consts.ORGANIZATION, repo)
         content += '[{}]({}):\n\n'.format(repo, repo_url)
-        for pr in merged_prs:
-            if pr.title.startswith('[release] '):
-                continue
-            if pr.author not in contributors:
-                contributors.append(pr.author)
-            content += ' * [{}]({}/pull/{})\n'.format(pr.title, repo_url, pr.number)
-        content += '\n'
+        content += write_merged_prs(merged_prs)
+
+    write_msg("Gettings merged PRs from gir...")
+    merged_prs = git.get_pulls('gir', consts.ORGANIZATION, 'closed', oldest_date, only_merged=True)
+    if len(merged_prs) > 0:
+        content += ('All this was possible thanks to the [gtk-rs/gir]({}/{}/{}) project as well:\n'
+                    .format(GITHUB_URL, ORGANIZATION, '/gir'))
+        content += write_merged_prs(merged_prs)
+
     content += 'Thanks to all of our contributors for their (awesome!) work for this release:\n\n'
     content += '\n'.join([' * [@{}]({}/{})'.format(contributor, consts.GITHUB_URL, contributor)
                           for contributor in contributors])
