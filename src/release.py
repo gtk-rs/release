@@ -4,7 +4,7 @@ from contextlib import contextmanager
 # pip3 install datetime
 import datetime
 from github import Github
-from os import listdir
+from os import listdir, sep as os_sep
 from os.path import isdir, isfile, join
 from my_toml import TomlHandler
 from utils import clone_repo, compare_versions, exec_command, exec_command_and_print_error
@@ -143,7 +143,7 @@ def update_crate_version(repo_name, crate_name, crate_dir_path, temp_dir, specif
                 if find_crate(entry['key']):
                     section.set(entry['key'], CRATES_VERSION[entry['key']])
     result = write_into_file(file, "{}\n".format(toml))
-    write_msg('=> {}: {}'.format(output.split('/')[-2],
+    write_msg('=> {}: {}'.format(output.split(os_sep)[-2],
                                  'Failure' if result is False else 'Success'))
     return result
 
@@ -167,14 +167,14 @@ def update_repo_version(repo_name, crate_name, crate_dir_path, temp_dir, update_
                 continue
             new_version = None
             if badges_only is False:
-                new_version = update_version(new_version, update_type, section.name)
+                new_version = update_version(version, update_type, section.name)
             else:
                 new_version = version
             if new_version is None:
                 return False
             # Print the status directly if it's the crate's version.
             if section.name == 'package':
-                write_msg('\t{}: {} => {}'.format(output.split('/')[-2], version, new_version))
+                write_msg('\t{}: {} => {}'.format(output.split(os_sep)[-2], version, new_version))
                 CRATES_VERSION[crate_name] = new_version
             else:  # Otherwise add it to the list to print later.
                 versions_update.append({'dependency_name': section.name[13:],
@@ -198,7 +198,7 @@ def update_repo_version(repo_name, crate_name, crate_dir_path, temp_dir, update_
     if badges_only is False:
         # We only write into the file if we're not just getting the crates version.
         result = write_into_file(file, out)
-    write_msg('=> {}: {}'.format(output.split('/')[-2],
+    write_msg('=> {}: {}'.format(output.split(os_sep)[-2],
                                  'Failure' if result is False else 'Success'))
     return result
 
@@ -464,8 +464,8 @@ def generate_new_tag(repository, temp_dir, specified_crate):
             versions[crate['crate']] = CRATES_VERSION[crate['crate']]
             if crate['crate'].endswith('-sys') or crate['crate'].endswith('-sys-rs'):
                 version = CRATES_VERSION[crate['crate']]
-    if specified_crate is not None and
-           (specified_crate.endswith('-sys') or specified_crate.endswith('-sys-rs')):
+    if (specified_crate is not None and
+            (specified_crate.endswith('-sys') or specified_crate.endswith('-sys-rs'))):
         write_msg('Seems like "{}" is part of a repository with multiple crates so no \
                    tag generation this time...'.format(specified_crate))
         return
