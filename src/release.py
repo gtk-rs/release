@@ -459,7 +459,7 @@ def generate_new_tag(repository, temp_dir, specified_crate):
     # get the most common version number and then we create the tag from there.
     #
     # First, we get all versions.
-    for crate in CRATE_LIST:
+    for crate in consts.CRATE_LIST:
         if crate['repository'] == repository:
             versions[crate['crate']] = CRATES_VERSION[crate['crate']]
             if crate['crate'].endswith('-sys') or crate['crate'].endswith('-sys-rs'):
