@@ -164,16 +164,15 @@ class Organization:
                                  token=self.gh_obj.token)
         if repos is None:
             return []
-        return [Repository(self.gh_obj, repo['name'], repo['owner']['login'], repo['updated_at'])
+        return [Repository(self.gh_obj, repo['name'], repo['owner']['login'])
                 for repo in repos]
 
 
 class Repository:
-    def __init__(self, gh_obj, name, owner, last_updated):
+    def __init__(self, gh_obj, name, owner):
         self.name = name
         self.gh_obj = gh_obj
         self.owner = owner
-        self.last_updated = last_updated
 
     def get_pulls(self, state, max_date, only_merged=False):
         prs = get_all_contents('https://api.github.com/repos/%s/%s/pulls'
