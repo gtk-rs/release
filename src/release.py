@@ -378,7 +378,7 @@ def end_docs_build(temp_dir):
     add_to_commit(consts.DOC_REPO, temp_dir, ['.'])
 
 
-def write_merged_prs(merged_prs):
+def write_merged_prs(merged_prs, contributors):
     content = ''
     for pr in merged_prs:
         if pr.title.startswith('[release] '):
@@ -425,14 +425,14 @@ For the interested ones, here is the list of the (major) changes:
             continue
         repo_url = '{}/{}/{}'.format(consts.GITHUB_URL, consts.ORGANIZATION, repo)
         content += '[{}]({}):\n\n'.format(repo, repo_url)
-        content += write_merged_prs(merged_prs)
+        content += write_merged_prs(merged_prs, contributors)
 
     write_msg("Gettings merged PRs from gir...")
     merged_prs = git.get_pulls('gir', consts.ORGANIZATION, 'closed', oldest_date, only_merged=True)
     if len(merged_prs) > 0:
         content += ('All this was possible thanks to the [gtk-rs/gir]({}/{}/{}) project as well:\n'
                     .format(GITHUB_URL, ORGANIZATION, '/gir'))
-        content += write_merged_prs(merged_prs)
+        content += write_merged_prs(merged_prs, contributors)
 
     content += 'Thanks to all of our contributors for their (awesome!) work for this release:\n\n'
     content += '\n'.join([' * [@{}]({}/{})'.format(contributor, consts.GITHUB_URL, contributor)
