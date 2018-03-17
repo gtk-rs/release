@@ -320,7 +320,7 @@ def update_badges(repo_name, temp_dir, specified_crate):
             current = None
             continue
         out.append(line + '\n')
-    return write_into_file(path, ''.join(out))
+    return write_into_file(path, ''.join(out).replace('\n\n', '\n'))
 
 
 def cleanup_doc_repo(temp_dir):
