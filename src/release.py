@@ -15,11 +15,8 @@ import errno
 import getopt
 import time
 import shutil
-import subprocess
 import sys
 import tempfile
-# pip3 install toml
-import toml
 
 
 CRATES_VERSION = {}
@@ -126,7 +123,6 @@ def update_crate_version(repo_name, crate_name, crate_dir_path, temp_dir, specif
     if content is None:
         return False
     toml = TomlHandler(content)
-    versions_update = []
     for section in toml.sections:
         if section.name == 'package':
             section.set('version', CRATES_VERSION[crate_name])
@@ -410,7 +406,6 @@ For the interested ones, here is the list of the (major) changes:
     git = Github(token)
     oldest_date = None
     for repo in repositories:
-        prs = []
         checkout_target_branch(repo, temp_dir, "crate")
         success, out, err = exec_command(['git', 'log', '--format=%at', '--no-merges', '-n', '1'])
         if not success:
