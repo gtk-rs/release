@@ -1,6 +1,5 @@
 import consts
-from os import listdir
-from os.path import isdir, isfile, join
+from os.path import join
 from my_toml import TomlHandler
 import json
 import subprocess
@@ -78,7 +77,7 @@ def clone_repo(repo_name, temp_dir, depth=None):
     except subprocess.TimeoutExpired:
         write_error('command timed out: {}'.format(' '.join(command)))
     except Exception as ex:
-        write_error('command got an exception: {}'.format(' '.join(command)))
+        write_error('command "{}" got an exception: {}'.format(' '.join(command), ex))
     return False
 
 
