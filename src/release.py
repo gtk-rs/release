@@ -697,7 +697,7 @@ def main(argv):
             write_msg('"{}": unknown option'.format(opt))
             write_msg('Use "-h" or "--help" to see help')
             sys.exit(0)
-    if token is None:
+    if token is None and no_push is False:
         write_error('Missing token argument.')
         sys.exit(4)
     if mode is None and doc_only is False and badges_only is False:
