@@ -138,7 +138,7 @@ def update_crate_version(repo_name, crate_name, crate_dir_path, temp_dir, specif
             for entry in section.entries:
                 if find_crate(entry['key']):
                     section.set(entry['key'], CRATES_VERSION[entry['key']])
-    result = write_into_file(file, "{}\n".format(toml))
+    result = write_into_file(file, str(toml))
     write_msg('=> {}: {}'.format(output.split(os_sep)[-2],
                                  'Failure' if result is False else 'Success'))
     return result
@@ -187,7 +187,7 @@ def update_repo_version(repo_name, crate_name, crate_dir_path, temp_dir, update_
     for up in versions_update:
         write_msg('\t{}: {} => {}'.format(up['dependency_name'], up['old_version'],
                                           up['new_version']))
-    out = "{}".format(toml)
+    out = str(toml)
     if not out.endswith("\n"):
         out += '\n'
     result = True
