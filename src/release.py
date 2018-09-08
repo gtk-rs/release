@@ -251,7 +251,8 @@ def merging_branches(repo_name, temp_dir, merge_branch):
 
 def publish_crate(repository, crate_dir_path, temp_dir):
     path = join(join(temp_dir, repository), crate_dir_path)
-    command = ['bash', '-c', 'cd {} && cargo publish'.format(path)]
+    # In case we needed to fix bugs, we checkout to crate branch before publishing crate.
+    command = ['bash', '-c', 'cd {} && git checkout crate && cargo publish'.format(path)]
     if not exec_command_and_print_error(command):
         input("Something bad happened! Try to fix it and then press ENTER to continue...")
 
