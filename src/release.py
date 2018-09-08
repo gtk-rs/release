@@ -242,6 +242,15 @@ def checkout_target_branch(repo_name, temp_dir, target_branch):
         input("Fix the error and then press ENTER")
 
 
+def get_last_commit_date(repo_name, temp_dir):
+    repo_path = join(temp_dir, repo_name)
+    success, out, err = exec_command(['bash', '-c',
+                                      'cd {} && git log --format=%at --no-merges -n 1'.format(
+                                          repo_path)
+                                      ])
+    return (success, out, err)
+
+
 def merging_branches(repo_name, temp_dir, merge_branch):
     repo_path = join(temp_dir, repo_name)
     command = ['bash', '-c', 'cd {} && git merge "origin/{}"'.format(repo_path, merge_branch)]
@@ -408,7 +417,7 @@ For the interested ones, here is the list of the (major) changes:
     oldest_date = None
     for repo in repositories:
         checkout_target_branch(repo, temp_dir, "crate")
-        success, out, err = exec_command(['git', 'log', '--format=%at', '--no-merges', '-n', '1'])
+        success, out, err = get_last_commit_date(repo, temp_dir)
         if not success:
             write_msg("Couldn't get PRs for '{}': {}".format(repo, err))
             continue
@@ -417,6 +426,7 @@ For the interested ones, here is the list of the (major) changes:
             oldest_date = max_date
         write_msg("Gettings merged PRs from {}...".format(repo))
         merged_prs = git.get_pulls(repo, consts.ORGANIZATION, 'closed', max_date, only_merged=True)
+        write_msg("=> Got {} merged PRs".format(len(merged_prs)))
         if len(merged_prs) < 1:
             continue
         repo_url = '{}/{}/{}'.format(consts.GITHUB_URL, consts.ORGANIZATION, repo)
