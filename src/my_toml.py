@@ -40,11 +40,33 @@ class Section:
 class TomlHandler:
     def __init__(self, content):
         self.sections = []
+        filler = []
+        multilines = {
+            '[': ']',
+            '"""': '"""',
+            '{': '}',
+        }
+        stop_str = None
         for line in content.split('\n'):
-            if line.startswith('['):
+            if len(filler) > 0:
+                filler.append(line)
+                if line.endswith(stop_str):
+                    self.sections[-1].add_entry('\n'.join(filler))
+                    filler = []
+            elif line.startswith('['):
                 self.sections.append(create_section(line))
             elif len(self.sections) > 0:
-                self.sections[-1].add_entry(line)
+                add_entry = True
+                for key, end_str in multilines.items():
+                    if line.endswith(key):
+                        stop_str = end_str
+                        filler.append(line)
+                        add_entry = False
+                        break
+                if add_entry is True:
+                    self.sections[-1].add_entry(line)
+                    continue
+
 
     def __str__(self):
-        return '\n\n'.join([str(x) for x in self.sections])
+        return '\n\n'.join([str(x) for x in self.sections]) + '\n'
