@@ -21,7 +21,9 @@ import tempfile
 
 CRATES_VERSION = {}
 PULL_REQUESTS = []
-SEARCH_INDEX = ["var searchIndex = {};"]
+SEARCH_INDEX = []
+SEARCH_INDEX_BEFORE = []
+SEARCH_INDEX_AFTER = []
 
 
 class UpdateType:
@@ -114,12 +116,12 @@ def find_crate(crate_name):
 
 
 def update_crate_version(repo_name, crate_name, crate_dir_path, temp_dir, specified_crate):
-    file = join(join(join(temp_dir, repo_name), crate_dir_path), "Cargo.toml")
-    output = file.replace(temp_dir, "")
+    file_path = join(join(join(temp_dir, repo_name), crate_dir_path), "Cargo.toml")
+    output = file_path.replace(temp_dir, "")
     if output.startswith('/'):
         output = output[1:]
-    write_msg('=> Updating crate versions for {}'.format(file))
-    content = get_file_content(file)
+    write_msg('=> Updating crate versions for {}'.format(file_path))
+    content = get_file_content(file_path)
     if content is None:
         return False
     toml = TomlHandler(content)
@@ -138,19 +140,19 @@ def update_crate_version(repo_name, crate_name, crate_dir_path, temp_dir, specif
             for entry in section.entries:
                 if find_crate(entry['key']):
                     section.set(entry['key'], CRATES_VERSION[entry['key']])
-    result = write_into_file(file, str(toml))
+    result = write_into_file(file_path, str(toml))
     write_msg('=> {}: {}'.format(output.split(os_sep)[-2],
                                  'Failure' if result is False else 'Success'))
     return result
 
 
 def update_repo_version(repo_name, crate_name, crate_dir_path, temp_dir, update_type, badges_only):
-    file = join(join(join(temp_dir, repo_name), crate_dir_path), "Cargo.toml")
-    output = file.replace(temp_dir, "")
+    file_path = join(join(join(temp_dir, repo_name), crate_dir_path), "Cargo.toml")
+    output = file_path.replace(temp_dir, "")
     if output.startswith('/'):
         output = output[1:]
-    write_msg('=> Updating versions for {}'.format(file))
-    content = get_file_content(file)
+    write_msg('=> Updating versions for {}'.format(file_path))
+    content = get_file_content(file_path)
     if content is None:
         return False
     toml = TomlHandler(content)
@@ -193,7 +195,7 @@ def update_repo_version(repo_name, crate_name, crate_dir_path, temp_dir, update_
     result = True
     if badges_only is False:
         # We only write into the file if we're not just getting the crates version.
-        result = write_into_file(file, out)
+        result = write_into_file(file_path, out)
     write_msg('=> {}: {}'.format(output.split(os_sep)[-2],
                                  'Failure' if result is False else 'Success'))
     return result
@@ -363,13 +365,21 @@ def build_docs(repo_name, temp_dir):
                        join(temp_dir, consts.DOC_REPO))]
     if not exec_command_and_print_error(command):
         input("Couldn't copy docs! Try to fix it and then press ENTER to continue...")
-    lines = get_file_content(join(path, 'target/doc/search-index.js')).split('\n')[1:]
+    lines = get_file_content(join(path, 'target/doc/search-index.js')).split('\n')
+    before = True
+    fill_extras = len(SEARCH_INDEX_BEFORE) == 0
     for line in lines:
-        # We need to be careful in here if we're in a sys repository (which should never be the
-        # case!).
-        if line.startswith('searchIndex["{}"]'.format(repo_name.replace('-', '_'))):
-            SEARCH_INDEX.append(line)
-            return
+        if line.startswith('searchIndex['):
+            before = False
+            # We need to be careful in here if we're in a sys repository (which should never be the
+            # case!).
+            if line.startswith('searchIndex["{}"]'.format(repo_name.replace('-', '_'))):
+                SEARCH_INDEX.append(line)
+        elif fill_extras is True:
+            if before is True:
+                SEARCH_INDEX_BEFORE.append(line)
+            else:
+                SEARCH_INDEX_AFTER.append(line)
     input("Couldn't find \"{}\" in `searchIndex.js`! Try to fix it and then press ENTER to \
           continue...".format(repo_name.replace('-', '_')))
 
@@ -378,9 +388,11 @@ def end_docs_build(temp_dir):
     path = join(temp_dir, consts.DOC_REPO)
     revert_changes(consts.DOC_REPO, temp_dir,
                    ['COPYRIGHT.txt', 'LICENSE-APACHE.txt', 'LICENSE-MIT.txt'])
+    lines = get_file_content(join(path, 'target/doc/search-index.js')).split('\n')
     with open(join(path, 'search-index.js'), 'w') as f:
+        f.write('\n'.join(SEARCH_INDEX_BEFORE))
         f.write('\n'.join(SEARCH_INDEX))
-        f.write('\ninitSearch(searchIndex);\n')
+        f.write('\n'.join(SEARCH_INDEX_AFTER))
     add_to_commit(consts.DOC_REPO, temp_dir, ['.'])
 
 
@@ -495,7 +507,7 @@ def generate_new_tag(repository, temp_dir, specified_crate):
         if version is None:
             write_error('Something impossible happened for "{}": no version can be tagged...'
                         .format(repository))
-            input('If you think you can do better, go ahead! (In "{}".) Then press ENTER to continue'
+            input('If you think you can do better, go ahead! (In "{}") Then press ENTER to continue'
                   .format(join(temp_dir, repository)))
             return
     write_msg('==> Creating new tag "{}" for repository "{}"...'.format(version, repository))
