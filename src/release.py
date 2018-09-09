@@ -291,7 +291,7 @@ def create_pull_request(repo_name, from_branch, target_branch, token):
                                                    repo_name),
                      token,
                      {'title': '[release] merging {} into {}'.format(from_branch, target_branch),
-                      'body': 'cc @GuillaumeGomez @EPashkin',
+                      'body': 'cc @GuillaumeGomez @EPashkin @sdroege',
                       'base': target_branch,
                       'head': from_branch,
                       'maintainer_can_modify': True})
