@@ -449,9 +449,11 @@ For the interested ones, here is the list of the (major) changes:
 
     write_msg("Gettings merged PRs from gir...")
     merged_prs = git.get_pulls('gir', consts.ORGANIZATION, 'closed', oldest_date, only_merged=True)
+    write_msg("=> Got {} merged PRs".format(len(merged_prs)))
     if len(merged_prs) > 0:
-        content += ('All this was possible thanks to the [gtk-rs/gir]({}/{}/{}) project as well:\n'
-                    .format(consts.GITHUB_URL, consts.ORGANIZATION, '/gir'))
+        repo_url = '{}/{}/{}'.format(consts.GITHUB_URL, consts.ORGANIZATION, 'gir')
+        content += ('All this was possible thanks to the [gtk-rs/gir]({}) project as well:\n\n'
+                    .format(repo_url))
         content += write_merged_prs(merged_prs, contributors, repo_url)
 
     content += 'Thanks to all of our contributors for their (awesome!) work for this release:\n\n'
