@@ -260,12 +260,14 @@ def merging_branches(repo_name, temp_dir, merge_branch):
         input("Fix the error and then press ENTER")
 
 
-def publish_crate(repository, crate_dir_path, temp_dir):
+def publish_crate(repository, crate_dir_path, temp_dir, crate_name):
+    write_msg('=> publishing crate {}'.format(crate_name))
     path = join(join(temp_dir, repository), crate_dir_path)
     # In case we needed to fix bugs, we checkout to crate branch before publishing crate.
     command = ['bash', '-c', 'cd {} && git checkout crate && cargo publish'.format(path)]
     if not exec_command_and_print_error(command):
         input("Something bad happened! Try to fix it and then press ENTER to continue...")
+    write_msg('> crate {} has been published'.format(crate_name))
 
 
 def create_tag_and_push(tag_name, repository, temp_dir):
@@ -619,8 +621,7 @@ def start(update_type, token, no_push, doc_only, specified_crate, badges_only):
                 for crate in consts.CRATE_LIST:
                     if specified_crate is not None and crate['crate'] != specified_crate:
                         continue
-                    publish_crate(crate["repository"], crate["path"], temp_dir)
-                    write_msg('> crate {} has been published'.format(crate['crate']))
+                    publish_crate(crate["repository"], crate["path"], temp_dir, crate['crate'])
                 write_msg('Done!')
 
                 write_msg("=> Generating tags...")
