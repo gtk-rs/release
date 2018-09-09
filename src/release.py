@@ -610,9 +610,6 @@ def start(update_type, token, no_push, doc_only, specified_crate, badges_only):
                 for repo in repositories:
                     create_pull_request(repo, consts.CRATE_TMP_BRANCH, "crate", token)
                 write_msg('Done!')
-                write_msg('=> Creating PR for examples repository')
-                create_pull_request("examples", "pending", "master", token)
-                write_msg('Done!')
 
                 write_msg('+++++++++++++++')
                 write_msg('++ IMPORTANT ++')
@@ -627,6 +624,10 @@ def start(update_type, token, no_push, doc_only, specified_crate, badges_only):
                     if specified_crate is not None and crate['crate'] != specified_crate:
                         continue
                     publish_crate(crate["repository"], crate["path"], temp_dir, crate['crate'])
+                write_msg('Done!')
+
+                write_msg('=> Creating PR for examples repository')
+                create_pull_request("examples", "pending", "master", token)
                 write_msg('Done!')
 
                 write_msg("=> Generating tags...")
