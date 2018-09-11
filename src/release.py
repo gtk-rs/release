@@ -560,7 +560,7 @@ def start(update_type, token, no_push, doc_only, specified_crate, badges_only):
                           .format(" and pushing" if no_push is False else "",
                                   consts.MASTER_TMP_BRANCH))
                 for repo in repositories:
-                    commit(repo, temp_dir, "Update versions")
+                    commit(repo, temp_dir, "Update versions [ci skip]")
                     if no_push is False:
                         push(repo, temp_dir, consts.MASTER_TMP_BRANCH)
                 write_msg('Done!')
@@ -600,7 +600,7 @@ def start(update_type, token, no_push, doc_only, specified_crate, badges_only):
                       .format(" and pushing" if no_push is False else "",
                               consts.CRATE_TMP_BRANCH))
             for repo in repositories:
-                commit(repo, temp_dir, "Update versions")
+                commit(repo, temp_dir, "Update versions [ci skip]")
                 if no_push is False:
                     push(repo, temp_dir, consts.CRATE_TMP_BRANCH)
             write_msg('Done!')
