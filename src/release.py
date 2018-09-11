@@ -146,7 +146,8 @@ def update_crate_version(repo_name, crate_name, crate_dir_path, temp_dir, specif
     return result
 
 
-def update_repo_version(repo_name, crate_name, crate_dir_path, temp_dir, update_type, badges_only):
+def update_repo_version(repo_name, crate_name, crate_dir_path, temp_dir, update_type,
+                        no_update):
     file_path = join(join(join(temp_dir, repo_name), crate_dir_path), "Cargo.toml")
     output = file_path.replace(temp_dir, "")
     if output.startswith('/'):
@@ -164,7 +165,7 @@ def update_repo_version(repo_name, crate_name, crate_dir_path, temp_dir, update_
             if version is None:
                 continue
             new_version = None
-            if badges_only is False:
+            if no_update is False:
                 new_version = update_version(version, update_type, section.name)
             else:
                 new_version = version
@@ -193,11 +194,11 @@ def update_repo_version(repo_name, crate_name, crate_dir_path, temp_dir, update_
     if not out.endswith("\n"):
         out += '\n'
     result = True
-    if badges_only is False:
+    if no_update is False:
         # We only write into the file if we're not just getting the crates version.
         result = write_into_file(file_path, out)
-    write_msg('=> {}: {}'.format(output.split(os_sep)[-2],
-                                 'Failure' if result is False else 'Success'))
+        write_msg('=> {}: {}'.format(output.split(os_sep)[-2],
+                                     'Failure' if result is False else 'Success'))
     return result
 
 
@@ -477,48 +478,22 @@ For the interested ones, here is the list of the (major) changes:
 def generate_new_tag(repository, temp_dir, specified_crate):
     versions = {}
     version = None
-    # In some repositories (like sys), there are more than one crates. In such case, we try to
-    # get the most common version number and then we create the tag from there.
+
+    # We make a new tag for every crate:
     #
-    # First, we get all versions.
+    # * If it is a "sys" crate, then we add its name to the tag
+    # * If not, then we just keep its version number
     for crate in consts.CRATE_LIST:
         if crate['repository'] == repository:
-            versions[crate['crate']] = CRATES_VERSION[crate['crate']]
+            tag_name = CRATES_VERSION[crate['crate']]
             if crate['crate'].endswith('-sys') or crate['crate'].endswith('-sys-rs'):
-                version = CRATES_VERSION[crate['crate']]
-    if (specified_crate is not None and
-            (specified_crate.endswith('-sys') or specified_crate.endswith('-sys-rs'))):
-        write_msg('Seems like "{}" is part of a repository with multiple crates so no \
-                   tag generation this time...'.format(specified_crate))
-        return
-
-    if version is None:
-        most_common = {}
-        # Now we get how many crates have this version.
-        for version in versions:
-            if versions[version] in most_common:
-                most_common[versions[version]] += 1
-            else:
-                most_common[versions[version]] = 1
-        # Now we get the "lowest" version that will be used as default tag name.
-        for common in most_common:
-            if version is None or compare_versions(common, version) < 0:
-                version = common
-        # And now we get the most common tag name.
-        for common in most_common:
-            if version is None or most_common[version] < most_common[common]:
-                version = common
-        if version is None:
-            write_error('Something impossible happened for "{}": no version can be tagged...'
-                        .format(repository))
-            input('If you think you can do better, go ahead! (In "{}") Then press ENTER to continue'
-                  .format(join(temp_dir, repository)))
-            return
-    write_msg('==> Creating new tag "{}" for repository "{}"...'.format(version, repository))
-    create_tag_and_push(version, repository, temp_dir)
+                tag_name = '{}-{}'.format(crate['crate'], tag_name)
+            write_msg('==> Creating new tag "{}" for repository "{}"...'.format(tag_name,
+                                                                                repository))
+            create_tag_and_push(tag_name, repository, temp_dir)
 
 
-def start(update_type, token, no_push, doc_only, specified_crate, badges_only):
+def start(update_type, token, no_push, doc_only, specified_crate, badges_only, tags_only):
     write_msg('=> Creating temporary directory...')
     with TemporaryDirectory() as temp_dir:
         write_msg('Temporary directory created in "{}"'.format(temp_dir))
@@ -550,12 +525,12 @@ def start(update_type, token, no_push, doc_only, specified_crate, badges_only):
                 if specified_crate is not None and crate['crate'] != specified_crate:
                     continue
                 if update_repo_version(crate["repository"], crate["crate"], crate["path"],
-                                       temp_dir, update_type, badges_only) is False:
+                                       temp_dir, update_type, badges_only or tags_only) is False:
                     write_error('The update for the "{}" crate failed...'.format(crate["crate"]))
                     return
             write_msg('Done!')
 
-            if badges_only is False:
+            if badges_only is False and tags_only is False:
                 write_msg('=> Committing{} to the "{}" branch...'
                           .format(" and pushing" if no_push is False else "",
                                   consts.MASTER_TMP_BRANCH))
@@ -580,7 +555,7 @@ def start(update_type, token, no_push, doc_only, specified_crate, badges_only):
             checkout_target_branch(repo, temp_dir, "crate")
         write_msg('Done!')
 
-        if doc_only is False and badges_only is False:
+        if doc_only is False and badges_only is False and tags_only is False:
             write_msg('=> Merging "master" branches into "crate" branches...')
             for repo in repositories:
                 merging_branches(repo, temp_dir, "master")
@@ -630,12 +605,13 @@ def start(update_type, token, no_push, doc_only, specified_crate, badges_only):
                 create_pull_request("examples", "pending", "master", token)
                 write_msg('Done!')
 
-                write_msg("=> Generating tags...")
-                for repo in repositories:
-                    generate_new_tag(repo, temp_dir, specified_crate)
-                write_msg('Done!')
+        if no_push is False and doc_only is False and badges_only is False:
+            write_msg("=> Generating tags...")
+            for repo in repositories:
+                generate_new_tag(repo, temp_dir, specified_crate)
+            write_msg('Done!')
 
-        if badges_only is False:
+        if badges_only is False and tags_only is False:
             write_msg('=> Preparing doc repo (too much dark magic in here urg)...')
             cleanup_doc_repo(temp_dir)
             write_msg('Done!')
@@ -658,7 +634,7 @@ def start(update_type, token, no_push, doc_only, specified_crate, badges_only):
                 write_msg("New pull request(s):\n\n{}\n".format('\n'.join(PULL_REQUESTS)))
             write_msg('Done!')
 
-        if doc_only is False:
+        if doc_only is False and tags_only is False:
             write_msg('=> Updating blog...')
             if update_badges(consts.BLOG_REPO, temp_dir, specified_crate) is False:
                 write_error("Error when trying to update badges...")
@@ -685,6 +661,7 @@ def write_help():
     write_msg(" * -c <crate> | --crate=<crate> : only update the given crate (for test purpose \
                mainly)")
     write_msg(" * --badges-only                : only update the badges on the website")
+    write_msg(" * --tags-only                  : only create new tags")
 
 
 def main(argv):
@@ -692,7 +669,7 @@ def main(argv):
         opts, args = getopt.getopt(argv,
                                    "ht:m:c:",
                                    ["help", "token=", "mode=", "no-push", "doc-only", "crate",
-                                    "badges-only"])
+                                    "badges-only", "tags-only"])
     except getopt.GetoptError:
         write_help()
         sys.exit(2)
@@ -703,6 +680,8 @@ def main(argv):
     doc_only = False
     specified_crate = None
     badges_only = False
+    tags_only = False
+
     for opt, arg in opts:
         if opt in ('-h', '--help'):
             write_help()
@@ -723,6 +702,8 @@ def main(argv):
             badges_only = True
         elif opt in ('-c', '--crate'):
             specified_crate = arg
+        elif opt in ('--tags-only'):
+            tags_only = True
         else:
             write_msg('"{}": unknown option'.format(opt))
             write_msg('Use "-h" or "--help" to see help')
@@ -730,10 +711,10 @@ def main(argv):
     if token is None and no_push is False:
         write_error('Missing token argument.')
         sys.exit(4)
-    if mode is None and doc_only is False and badges_only is False:
+    if mode is None and doc_only is False and badges_only is False and tags_only is False:
         write_error('Missing update type argument.')
         sys.exit(5)
-    start(mode, token, no_push, doc_only, specified_crate, badges_only)
+    start(mode, token, no_push, doc_only, specified_crate, badges_only, tags_only)
 
 
 # Beginning of the script
