@@ -31,4 +31,5 @@ CRATE_LIST = [
     { "crate": "gtk",            "repository": "gtk",        "path": "" },
     { "crate": "sourceview",     "repository": "sourceview", "path": "" },
     { "crate": "pangocairo",     "repository": "pangocairo", "path": "" },
+    { "crate": "gtk-test",       "repository": "gtk-test",   "path": "" },
 ]
