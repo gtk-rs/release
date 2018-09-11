@@ -197,8 +197,8 @@ def update_repo_version(repo_name, crate_name, crate_dir_path, temp_dir, update_
     if no_update is False:
         # We only write into the file if we're not just getting the crates version.
         result = write_into_file(file_path, out)
-    write_msg('=> {}: {}'.format(output.split(os_sep)[-2],
-                                 'Failure' if result is False else 'Success'))
+        write_msg('=> {}: {}'.format(output.split(os_sep)[-2],
+                                     'Failure' if result is False else 'Success'))
     return result
 
 
@@ -487,7 +487,7 @@ def generate_new_tag(repository, temp_dir, specified_crate):
         if crate['repository'] == repository:
             tag_name = CRATES_VERSION[crate['crate']]
             if crate['crate'].endswith('-sys') or crate['crate'].endswith('-sys-rs'):
-                tag_name = '{}-{}'.format(crate['crate'], CRATES_VERSION[crate['crate']])
+                tag_name = '{}-{}'.format(crate['crate'], tag_name)
             write_msg('==> Creating new tag "{}" for repository "{}"...'.format(tag_name,
                                                                                 repository))
             create_tag_and_push(tag_name, repository, temp_dir)
@@ -605,7 +605,7 @@ def start(update_type, token, no_push, doc_only, specified_crate, badges_only, t
                 create_pull_request("examples", "pending", "master", token)
                 write_msg('Done!')
 
-        if no_push is False and doc_only is False and badges_only is False and tags_only is False:
+        if no_push is False and doc_only is False and badges_only is False:
             write_msg("=> Generating tags...")
             for repo in repositories:
                 generate_new_tag(repo, temp_dir, specified_crate)
@@ -634,7 +634,7 @@ def start(update_type, token, no_push, doc_only, specified_crate, badges_only, t
                 write_msg("New pull request(s):\n\n{}\n".format('\n'.join(PULL_REQUESTS)))
             write_msg('Done!')
 
-        if doc_only is False:
+        if doc_only is False and tags_only is False:
             write_msg('=> Updating blog...')
             if update_badges(consts.BLOG_REPO, temp_dir, specified_crate) is False:
                 write_error("Error when trying to update badges...")
