@@ -359,6 +359,7 @@ def build_docs(repo_name, temp_dir):
         write_error('Error occured in build docs: {}'.format(e))
         input("It seems like the \"{}\" folder doesn't exist. Try to fix it then press ENTER..."
               .format(doc_folder))
+    # Copy documentation files
     command = ['bash', '-c',
                'cd {} && cp -r "{}" src/{} {} "{}"'
                .format(doc_folder,
@@ -368,9 +369,21 @@ def build_docs(repo_name, temp_dir):
                        join(temp_dir, consts.DOC_REPO))]
     if not exec_command_and_print_error(command):
         input("Couldn't copy docs! Try to fix it and then press ENTER to continue...")
-    lines = get_file_content(join(path, 'target/doc/search-index.js')).split('\n')
+    # Copy source files
+    destination = "{}/src".format(join(temp_dir, consts.DOC_REPO))
+    command = ['bash', '-c',
+               'cd {} && mkdir -p "{}" && cp -r "src/{}" "{}/"'
+               .format(doc_folder,
+                       destination,
+                       repo_name.replace('-', '_'),
+                       destination)]
+    if not exec_command_and_print_error(command):
+        input("Couldn't copy doc source files! Try to fix it and then press ENTER to continue...")
+    search_index = join(path, 'target/doc/search-index.js')
+    lines = get_file_content(search_index).split('\n')
     before = True
     fill_extras = len(SEARCH_INDEX_BEFORE) == 0
+    found = False
     for line in lines:
         if line.startswith('searchIndex['):
             before = False
@@ -378,25 +391,31 @@ def build_docs(repo_name, temp_dir):
             # case!).
             if line.startswith('searchIndex["{}"]'.format(repo_name.replace('-', '_'))):
                 SEARCH_INDEX.append(line)
+                found = True
         elif fill_extras is True:
             if before is True:
                 SEARCH_INDEX_BEFORE.append(line)
             else:
                 SEARCH_INDEX_AFTER.append(line)
-    input("Couldn't find \"{}\" in `searchIndex.js`! Try to fix it and then press ENTER to \
-          continue...".format(repo_name.replace('-', '_')))
+    if found is False:
+        input("Couldn't find \"{}\" in `{}`! Try to fix it and then press ENTER to \
+               continue...".format(repo_name.replace('-', '_'), search_index))
 
 
 def end_docs_build(temp_dir):
     path = join(temp_dir, consts.DOC_REPO)
     revert_changes(consts.DOC_REPO, temp_dir,
                    ['COPYRIGHT.txt', 'LICENSE-APACHE.txt', 'LICENSE-MIT.txt'])
-    lines = get_file_content(join(path, 'target/doc/search-index.js')).split('\n')
-    with open(join(path, 'search-index.js'), 'w') as f:
-        f.write('\n'.join(SEARCH_INDEX_BEFORE))
-        f.write('\n'.join(SEARCH_INDEX))
-        f.write('\n'.join(SEARCH_INDEX_AFTER))
-    add_to_commit(consts.DOC_REPO, temp_dir, ['.'])
+    try:
+        lines = get_file_content(join(path, 'search-index.js')).split('\n')
+        with open(join(path, 'search-index.js'), 'w') as f:
+            f.write('\n'.join(SEARCH_INDEX_BEFORE))
+            f.write('\n'.join(SEARCH_INDEX))
+            f.write('\n'.join(SEARCH_INDEX_AFTER))
+        add_to_commit(consts.DOC_REPO, temp_dir, ['.'])
+    except Exception as e:
+        print('An exception occured in "end_docs_build": {}'.format(e))
+        input("Press ENTER to continue...")
 
 
 def write_merged_prs(merged_prs, contributors, repo_url):
@@ -618,7 +637,8 @@ def start(update_type, token, no_push, doc_only, specified_crate, badges_only, t
 
             write_msg('=> Building docs...')
             for repo in repositories:
-                if repo != "sys":  # Maybe we should generate docs for sys crates as well?
+                # TODO: Maybe we should generate docs for sys crates as well?
+                if repo != "sys" and repo != "docs" and repo != "gtk-test":
                     write_msg('-> Building docs for {}...'.format(repo))
                     build_docs(repo, temp_dir)
             end_docs_build(temp_dir)
