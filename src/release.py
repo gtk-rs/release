@@ -636,11 +636,11 @@ def start(update_type, token, no_push, doc_only, specified_crate, badges_only, t
             write_msg('Done!')
 
             write_msg('=> Building docs...')
-            for repo in repositories:
-                # TODO: Maybe we should generate docs for sys crates as well?
-                if repo != "sys" and repo != "docs" and repo != "gtk-test":
-                    write_msg('-> Building docs for {}...'.format(repo))
-                    build_docs(repo, temp_dir)
+            for crate in consts.CRATE_LIST:
+                if crate['crate'] == 'gtk-test':
+                    continue
+                write_msg('-> Building docs for {}...'.format(crate['crate']))
+                build_docs(join(crate['repository'], crate['path']), temp_dir)
             end_docs_build(temp_dir)
             write_msg('Done!')
 
