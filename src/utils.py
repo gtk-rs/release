@@ -160,7 +160,8 @@ def get_features(path):
                 else:
                     features.append(entry['key'])
     if dox_present is True:
-        features.append('dox')
+        if 'dox' not in features:
+            features.append('dox')
     elif highest_version is not None:
         print("/!\\ Seems there is no dox feature so let's just use the highest version instead...")
         features.append(highest_version)
