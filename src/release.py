@@ -678,8 +678,7 @@ def write_help():
     write_msg(" * -m <mode> | --mode=<mode>    : give the update type (MINOR|MEDIUM|MAJOR)")
     write_msg(" * --no-push                    : performs all operations but doesn't push anything")
     write_msg(" * --doc-only                   : only builds documentation")
-    write_msg(" * -c <crate> | --crate=<crate> : only update the given crate (for test purpose \
-               mainly)")
+    write_msg(" * -c <crate> | --crate=<crate> : only update the given crate (for test purpose mainly)")
     write_msg(" * --badges-only                : only update the badges on the website")
     write_msg(" * --tags-only                  : only create new tags")
 
