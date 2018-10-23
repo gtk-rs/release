@@ -343,12 +343,13 @@ def cleanup_doc_repo(temp_dir):
         input("Couldn't clean up docs! Try to fix it and then press ENTER to continue...")
 
 
-def build_docs(repo_name, temp_dir):
-    path = join(temp_dir, repo_name)
+def build_docs(repo_name, temp_dir, extra_path, crate_name):
+    path = join(join(temp_dir, repo_name), extra_path)
     features = get_features(join(path, 'Cargo.toml'))
+    # We can't add "--no-deps" argument to cargo doc, otherwise we lose links to items of
+    # other crates...
     command = ['bash', '-c',
-               'cd {} && cargo doc --no-default-features --features "{}"'
-               .format(path, features)]
+               'cd {} && cargo doc --no-default-features --features "{}"'.format(path, features)]
     if not exec_command_and_print_error(command):
         input("Couldn't generate docs! Try to fix it and then press ENTER to continue...")
     doc_folder = join(path, 'target/doc')
@@ -363,8 +364,8 @@ def build_docs(repo_name, temp_dir):
     command = ['bash', '-c',
                'cd {} && cp -r "{}" src/{} {} "{}"'
                .format(doc_folder,
-                       repo_name.replace('-', '_'),
-                       repo_name.replace('-', '_'),
+                       crate_name.replace('-', '_'),
+                       crate_name.replace('-', '_'),
                        file_list,
                        join(temp_dir, consts.DOC_REPO))]
     if not exec_command_and_print_error(command):
@@ -375,7 +376,7 @@ def build_docs(repo_name, temp_dir):
                'cd {} && mkdir -p "{}" && cp -r "src/{}" "{}/"'
                .format(doc_folder,
                        destination,
-                       repo_name.replace('-', '_'),
+                       crate_name.replace('-', '_'),
                        destination)]
     if not exec_command_and_print_error(command):
         input("Couldn't copy doc source files! Try to fix it and then press ENTER to continue...")
@@ -389,7 +390,7 @@ def build_docs(repo_name, temp_dir):
             before = False
             # We need to be careful in here if we're in a sys repository (which should never be the
             # case!).
-            if line.startswith('searchIndex["{}"]'.format(repo_name.replace('-', '_'))):
+            if line.startswith('searchIndex["{}"]'.format(crate_name.replace('-', '_'))):
                 SEARCH_INDEX.append(line)
                 found = True
         elif fill_extras is True:
@@ -398,8 +399,8 @@ def build_docs(repo_name, temp_dir):
             else:
                 SEARCH_INDEX_AFTER.append(line)
     if found is False:
-        input("Couldn't find \"{}\" in `{}`! Try to fix it and then press ENTER to \
-               continue...".format(repo_name.replace('-', '_'), search_index))
+        input("Couldn't find \"{}\" in `{}`!\nTry to fix it and then press ENTER to continue..."
+              .format(crate_name.replace('-', '_'), search_index))
 
 
 def end_docs_build(temp_dir):
@@ -640,7 +641,8 @@ def start(update_type, token, no_push, doc_only, specified_crate, badges_only, t
                 if crate['crate'] == 'gtk-test':
                     continue
                 write_msg('-> Building docs for {}...'.format(crate['crate']))
-                build_docs(join(crate['repository'], crate['path']), temp_dir)
+                build_docs(crate['repository'], temp_dir, crate['path'],
+                           crate.get('doc_name', crate['crate']))
             end_docs_build(temp_dir)
             write_msg('Done!')
 
@@ -678,8 +680,7 @@ def write_help():
     write_msg(" * -m <mode> | --mode=<mode>    : give the update type (MINOR|MEDIUM|MAJOR)")
     write_msg(" * --no-push                    : performs all operations but doesn't push anything")
     write_msg(" * --doc-only                   : only builds documentation")
-    write_msg(" * -c <crate> | --crate=<crate> : only update the given crate (for test purpose \
-               mainly)")
+    write_msg(" * -c <crate> | --crate=<crate> : only update the given crate (for test purpose mainly)")
     write_msg(" * --badges-only                : only update the badges on the website")
     write_msg(" * --tags-only                  : only create new tags")
 
