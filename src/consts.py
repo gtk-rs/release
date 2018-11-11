@@ -25,6 +25,7 @@ CRATE_LIST = [
     { "crate": "gtk-source-sys", "repository": "sourceview", "path": "sourceview-sys" },
     { "crate": "pangocairo-sys", "repository": "sys",        "path": "pangocairo-sys",
      "doc_name": "pango_cairo_sys" },
+    { "crate": "atk",            "repository": "atk",        "path": "" },
     { "crate": "gio",            "repository": "gio",        "path": "" },
     { "crate": "pango",          "repository": "pango",      "path": "" },
     { "crate": "cairo-rs",       "repository": "cairo",      "path": "",
