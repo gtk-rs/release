@@ -349,7 +349,8 @@ def build_docs(repo_name, temp_dir, extra_path, crate_name):
     # We can't add "--no-deps" argument to cargo doc, otherwise we lose links to items of
     # other crates...
     command = ['bash', '-c',
-               'cd {} && cargo doc --no-default-features --features "{}"'.format(path, features)]
+               'cd {} && cargo rustdoc --no-default-features --features "{}" -- \
+                -Z unstable-options --disable-minification'.format(path, features)]
     if not exec_command_and_print_error(command):
         input("Couldn't generate docs! Try to fix it and then press ENTER to continue...")
     doc_folder = join(path, 'target/doc')
