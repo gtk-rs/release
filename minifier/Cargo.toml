@@ -1,0 +1,8 @@
+[package]
+name = "minifier"
+version = "0.1.0"
+authors = ["Guillaume Gomez <guillaume1.gomez@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+minifier = "0.0.28"

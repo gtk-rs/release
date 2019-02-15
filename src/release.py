@@ -414,6 +414,10 @@ def end_docs_build(temp_dir):
             f.write('\n'.join(SEARCH_INDEX_BEFORE))
             f.write('\n'.join(SEARCH_INDEX))
             f.write('\n'.join(SEARCH_INDEX_AFTER))
+        command = ['bash', '-c',
+                   'cd minifier && cargo run --release -- "{}"'.format(path)]
+        if not exec_command_and_print_error(command):
+            input("Couldn't run minifier! Try to fix it and then press ENTER to continue...")
         add_to_commit(consts.DOC_REPO, temp_dir, ['.'])
     except Exception as e:
         print('An exception occured in "end_docs_build": {}'.format(e))
