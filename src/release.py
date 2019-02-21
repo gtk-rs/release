@@ -448,7 +448,7 @@ date: {}
 
 ### Changes
 
-For the interested ones, here is the list of the (major) changes:
+For the interested ones, here is the list of the merged pull requests:
 
 '''.format(input('Enter author name: '), input('Enter title: '),
            time.strftime("%Y-%m-%d %H:00:00 +0000"))
@@ -482,7 +482,7 @@ For the interested ones, here is the list of the (major) changes:
                     .format(repo_url))
         content += write_merged_prs(merged_prs, contributors, repo_url)
 
-    content += 'Thanks to all of our contributors for their (awesome!) work for this release:\n\n'
+    content += 'Thanks to all of our contributors for their (awesome!) work on this release:\n\n'
     content += '\n'.join([' * [@{}]({}/{})'.format(contributor, consts.GITHUB_URL, contributor)
                           for contributor in contributors])
     content += '\n'
