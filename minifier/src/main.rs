@@ -78,7 +78,8 @@ fn minify_search_index(file_path: &Path) {
                })
                .to_string();
     println!("TO {}", f.len());
-    write_to_file(file_path, &f);
+    write_to_file(file_path, &f.replace("var searchIndex={}",
+                                        "var N=null,E=\"\",T=\"t\",U=\"u\",searchIndex={}"));
 }
 
 fn minify_js_file(file_path: &Path) {
