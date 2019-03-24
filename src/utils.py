@@ -69,7 +69,7 @@ def clone_repo(repo_name, temp_dir, depth=None):
         command = ['git', 'clone', repo_url, target_dir]
         if depth is not None:
             command = ['git', 'clone', '--depth', '{}'.format(depth), repo_url, target_dir]
-        ret, stdout, stderr = exec_command(command, timeout=30)
+        ret, stdout, stderr = exec_command(command, timeout=300)
         if not ret:
             write_error('command "{}" failed: {}'.format(' '.join(command), stderr))
             return False
