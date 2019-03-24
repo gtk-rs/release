@@ -287,7 +287,7 @@ def push_tag(tag_name, repository, temp_dir):
         input("Something bad happened! Try to fix it and then press ENTER to continue...")
 
 
-def create_pull_request(repo_name, from_branch, target_branch, token):
+def create_pull_request(repo_name, from_branch, target_branch, token, add_to_list=True):
     r = post_content('{}/repos/{}/{}/pulls'.format(consts.GH_API_URL, consts.ORGANIZATION,
                                                    repo_name),
                      token,
@@ -311,7 +311,8 @@ def create_pull_request(repo_name, from_branch, target_branch, token):
                                      from_branch))
     else:
         write_msg("===> Pull request created: {}".format(r['html_url']))
-        PULL_REQUESTS.append('> {}'.format(r['html_url']))
+        if add_to_list is True:
+            PULL_REQUESTS.append('> {}'.format(r['html_url']))
 
 
 def update_badges(repo_name, temp_dir, specified_crate):
@@ -348,8 +349,11 @@ def build_docs(repo_name, temp_dir, extra_path, crate_name):
     features = get_features(join(path, 'Cargo.toml'))
     # We can't add "--no-deps" argument to cargo doc, otherwise we lose links to items of
     # other crates...
+    #
+    # Also, we run "cargo update" in case the lgpl-docs repository has been updated (so we get the
+    # last version).
     command = ['bash', '-c',
-               'cd {} && cargo rustdoc --no-default-features --features "{}" -- \
+               'cd {} && cargo update && cargo rustdoc --no-default-features --features "{}" -- \
                 -Z unstable-options --disable-minification'.format(path, features)]
     if not exec_command_and_print_error(command):
         input("Couldn't generate docs! Try to fix it and then press ENTER to continue...")
@@ -520,6 +524,44 @@ def generate_new_tag(repository, temp_dir, specified_crate):
             create_tag_and_push(tag_name, repository, temp_dir)
 
 
+def update_doc_content_repository(repositories, temp_dir, token, no_push):
+    if clone_repo(consts.DOC_CONTENT_REPO, temp_dir) is False:
+        input('Try to fix the problem then press ENTER to continue...')
+    repo_path = join(temp_dir, consts.DOC_CONTENT_REPO)
+    for repo in repositories:
+        if repo.get("doc", True) is False:
+            continue
+        path = join(temp_dir, repo['repository'])
+        command = ['bash', '-c',
+                   'cd {} && make doc && mv vendor.md {}'.format(path,
+                                                                 join(repo_path, repo['crate']))]
+        if not exec_command_and_print_error(command):
+            input("Fix the error and then press ENTER")
+    write_msg('Committing "{}" changes...'.format(consts.DOC_CONTENT_REPO))
+    commit(consts.DOC_CONTENT_REPO, temp_dir, "Update vendor files")
+    if no_push is False:
+        push(consts.DOC_CONTENT_REPO, temp_dir, consts.MASTER_TMP_BRANCH)
+
+    # We always make minor releases in here, no need for a more important one considering we don't
+    # change the API.
+    if update_repo_version(consts.DOC_CONTENT_REPO, consts.DOC_CONTENT_REPO, "",
+                           temp_dir, UpdateType.MINOR, False) is False:
+        write_error('The update for the "{}" crate failed...'.format(consts.DOC_CONTENT_REPO))
+        input('Fix the error and then press ENTER')
+    commit(consts.DOC_CONTENT_REPO, temp_dir, "Update version")
+    if no_push is False:
+        push(consts.DOC_CONTENT_REPO, temp_dir, consts.MASTER_TMP_BRANCH)
+        create_pull_request(consts.DOC_CONTENT_REPO, consts.MASTER_TMP_BRANCH, "master", token,
+                            False)
+        input('All done with the "{}" update: please merge the PR then press ENTER so the \
+               publication can performed...'.format(consts.DOC_CONTENT_REPO))
+        publish_crate(consts.DOC_CONTENT_REPO, "", temp_dir, consts.DOC_CONTENT_REPO)
+        write_msg('Ok all done! We can move forward now!')
+    else:
+        write_msg('All with "{}", you still need to publish a new version if you want the changes \
+                   to be taken into account'.format(consts.DOC_CONTENT_REPO))
+
+
 def start(update_type, token, no_push, doc_only, specified_crate, badges_only, tags_only):
     write_msg('=> Creating temporary directory...')
     with TemporaryDirectory() as temp_dir:
@@ -639,6 +681,11 @@ def start(update_type, token, no_push, doc_only, specified_crate, badges_only, t
             write_msg('Done!')
 
         if badges_only is False and tags_only is False:
+            # It might seem counter-intuitive but in case we didn't update other repositories,
+            # there is no interest into publishing a new version of "lgpl-docs".
+            input("remove me")
+            if doc_only is False:
+                update_doc_content_repository(repositories, temp_dir, token, no_push)
             write_msg('=> Preparing doc repo (too much dark magic in here urg)...')
             cleanup_doc_repo(temp_dir)
             write_msg('Done!')
