@@ -367,9 +367,8 @@ def build_docs(repo_name, temp_dir, extra_path, crate_name):
               .format(doc_folder))
     # Copy documentation files
     command = ['bash', '-c',
-               'cd {} && cp -r "{}" src/{} {} "{}"'
+               'cd {} && cp -r "{}" {} "{}"'
                .format(doc_folder,
-                       crate_name.replace('-', '_'),
                        crate_name.replace('-', '_'),
                        file_list,
                        join(temp_dir, consts.DOC_REPO))]
