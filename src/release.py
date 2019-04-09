@@ -682,7 +682,7 @@ def start(update_type, token, no_push, doc_only, specified_crate, badges_only, t
         if badges_only is False and tags_only is False:
             # It might seem counter-intuitive but in case we didn't update other repositories,
             # there is no interest into publishing a new version of "lgpl-docs".
-            input("remove me")
+            input("Are you sure you want to continue? (Press ENTER to continue)")
             if doc_only is False:
                 update_doc_content_repository(repositories, temp_dir, token, no_push)
             write_msg('=> Preparing doc repo (too much dark magic in here urg)...')
