@@ -41,42 +41,45 @@ fn minify_search_index(file_path: &Path) {
     let content = read_file(file_path);
     print!("FROM {} bytes ", content.len());
 
-    let f = js::simple_minify(&content)
-               .apply(|f| {
-                   // We keep backlines.
-                   js::clean_tokens_except(f, |c| {
-                       c.get_char() != Some(ReservedChar::Backline)
-                   })
-               })
-               .apply(|f| {
-                   js::replace_token_with(f, |t| {
-                       match *t {
-                           Token::Keyword(Keyword::Null) => Some(Token::Other("N")),
-                           Token::String(s) => {
-                               let s = &s[1..s.len() -1]; // The quotes are included
-                               if s.is_empty() {
-                                   Some(Token::Other("E"))
-                               } else if s == "t" {
-                                   Some(Token::Other("T"))
-                               } else if s == "u" {
-                                   Some(Token::Other("U"))
-                               } else {
-                                   None
-                               }
-                           }
-                           _ => None,
-                       }
-                   })
-               })
-               .apply(|f| {
-                   // We add a backline after the newly created variables.
-                   js::aggregate_strings_into_array_with_separation(
-                       f,
-                       "R",
-                       Token::Char(ReservedChar::Backline),
-                   )
-               })
-               .to_string();
+    let f: js::Tokens<'_> = js::simple_minify(&content)
+                               .into_iter()
+                               .filter(|f| {
+                                   // We keep backlines.
+                                   minifier::js::clean_token_except(f, &|c: &Token<'_>| {
+                                       c.get_char() != Some(ReservedChar::Backline)
+                                   })
+                               })
+                               .map(|f| {
+                                   minifier::js::replace_token_with(f, &|t: &Token<'_>| {
+                                       match *t {
+                                           Token::Keyword(Keyword::Null) => Some(Token::Other("N")),
+                                           Token::String(s) => {
+                                               let s = &s[1..s.len() -1]; // The quotes are included
+                                               if s.is_empty() {
+                                                   Some(Token::Other("E"))
+                                               } else if s == "t" {
+                                                   Some(Token::Other("T"))
+                                               } else if s == "u" {
+                                                   Some(Token::Other("U"))
+                                               } else {
+                                                   None
+                                               }
+                                           }
+                                           _ => None,
+                                       }
+                                   })
+                               })
+                               .collect::<Vec<_>>()
+                               .into();
+    let f = f.apply(|f| {
+        // We add a backline after the newly created variables.
+        minifier::js::aggregate_strings_into_array_with_separation(
+            f,
+            "R",
+            Token::Char(ReservedChar::Backline),
+        )
+    })
+    .to_string();
     println!("TO {}", f.len());
     write_to_file(file_path, &f.replace("var searchIndex={}",
                                         "var N=null,E=\"\",T=\"t\",U=\"u\",searchIndex={}"));

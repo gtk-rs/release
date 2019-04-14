@@ -5,4 +5,4 @@ authors = ["Guillaume Gomez <guillaume1.gomez@gmail.com>"]
 edition = "2018"
 
 [dependencies]
-minifier = "0.0.28"
+minifier = "0.0.29"
