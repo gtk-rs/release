@@ -7,7 +7,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "minifier"
-version = "0.0.28"
+version = "0.0.29"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "macro-utils 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -17,9 +17,9 @@ dependencies = [
 name = "minifier"
 version = "0.1.0"
 dependencies = [
- "minifier 0.0.28 (registry+https://github.com/rust-lang/crates.io-index)",
+ "minifier 0.0.29 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [metadata]
 "checksum macro-utils 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)" = "f2c4deaccc2ead6a28c16c0ba82f07d52b6475397415ce40876e559b0b0ea510"
-"checksum minifier 0.0.28 (registry+https://github.com/rust-lang/crates.io-index)" = "3a2898502751dcc9d66b6fff57f3cf63cc91605e83e1a33515396f5027f8e4ca"
+"checksum minifier 0.0.29 (registry+https://github.com/rust-lang/crates.io-index)" = "1f4950cb2617b1933e2da0446e864dfe0d6a22c22ff72297996c46e6a63b210b"
