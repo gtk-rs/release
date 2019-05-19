@@ -528,12 +528,21 @@ def update_doc_content_repository(repositories, temp_dir, token, no_push):
         input('Try to fix the problem then press ENTER to continue...')
     repo_path = join(temp_dir, consts.DOC_CONTENT_REPO)
     for repo in repositories:
-        if repo.get("doc", True) is False:
+        current = None
+        for crate in consts.CRATE_LIST:
+            if crate['repository'] == repo:
+                current = crate
+                break
+        if current is None:
+            input('No repository matches "{}", something is weird. (Press ENTER TO CONTINUE)')
             continue
-        path = join(temp_dir, repo['repository'])
+        if current.get("doc", True) is False:
+            continue
+        path = join(temp_dir, current['repository'])
         command = ['bash', '-c',
                    'cd {} && make doc && mv vendor.md {}'.format(path,
-                                                                 join(repo_path, repo['crate']))]
+                                                                 join(repo_path,
+                                                                      current['crate']))]
         if not exec_command_and_print_error(command):
             input("Fix the error and then press ENTER")
     write_msg('Committing "{}" changes...'.format(consts.DOC_CONTENT_REPO))
@@ -680,11 +689,9 @@ def start(update_type, token, no_push, doc_only, specified_crate, badges_only, t
             write_msg('Done!')
 
         if badges_only is False and tags_only is False:
-            # It might seem counter-intuitive but in case we didn't update other repositories,
-            # there is no interest into publishing a new version of "lgpl-docs".
-            input("Are you sure you want to continue? (Press ENTER to continue)")
-            if doc_only is False:
-                update_doc_content_repository(repositories, temp_dir, token, no_push)
+            input("About to regenerate documentation. Are you sure you want to continue? " +
+                  "(Press ENTER to continue)")
+            update_doc_content_repository(repositories, temp_dir, token, no_push)
             write_msg('=> Preparing doc repo (too much dark magic in here urg)...')
             cleanup_doc_repo(temp_dir)
             write_msg('Done!')
