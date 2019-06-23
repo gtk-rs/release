@@ -434,7 +434,10 @@ def write_merged_prs(merged_prs, contributors, repo_url):
             continue
         if pr.author not in contributors:
             contributors.append(pr.author)
-        content += ' * [{}]({}/pull/{})\n'.format(pr.title.replace('<', '&lt;').replace('>', '&gt;'),
+        content += ' * [{}]({}/pull/{})\n'.format(pr.title.replace('<', '&lt;')
+                                                          .replace('>', '&gt;')
+                                                          .replace('[', '\\[')
+                                                          .replace(']', '\\]'),
                                                   repo_url,
                                                   pr.number)
     return content + '\n'
