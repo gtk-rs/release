@@ -73,8 +73,8 @@ def update_version(version, update_type, section_name, place_type="section"):
             if c >= '0' and c <= '9':
                 break
             i += 1
-        if i >= len(c):
-            return None
+            if i >= len(c):
+                return None
         s = version_split[update_type][i:]
         version_split[update_type] = '{}{}'.format(version_split[update_type][:i], str(int(s) + 1))
         version_split[UpdateType.MEDIUM] = '0'
@@ -101,6 +101,7 @@ def check_and_update_version(entry, update_type, dependency_name, versions_updat
                                          place_type="dependency")
             if new_version is None:
                 return None
+            # Mostly for debugging, not really useful otherwise...
             versions_update.append({'dependency_name': dependency_name,
                                     'old_version': old_version,
                                     'new_version': new_version})
@@ -185,7 +186,8 @@ def update_repo_version(repo_name, crate_name, crate_dir_path, temp_dir, update_
                 if find_crate(entry):
                     new_version = check_and_update_version(section.entries[entry],
                                                            update_type,
-                                                           entry)
+                                                           entry,
+                                                           [])
                     section.set(entry, new_version)
     for up in versions_update:
         write_msg('\t{}: {} => {}'.format(up['dependency_name'], up['old_version'],
@@ -272,7 +274,7 @@ def publish_crate(repository, crate_dir_path, temp_dir, crate_name, checkout_bra
     final_success = False
     wait_time = 30
     while retry > 0:
-        ret, stdout, stderr = exec_command(command, timeout=timeout)
+        ret, stdout, stderr = exec_command(command)
         if not ret:
             error_messages.append('Command "{}" failed:'.format(' '.join(command)))
             if len(stdout) > 0:
@@ -296,9 +298,8 @@ def publish_crate(repository, crate_dir_path, temp_dir, crate_name, checkout_bra
 
 def create_tag_and_push(tag_name, repository, temp_dir):
     path = join(temp_dir, repository)
-    command = ['bash', '-c', 'cd {} && git tag "{}" && git push origin "{}"'.format(path,
-                                                                                    tag_name,
-                                                                                    tag_name)]
+    command = ['bash', '-c', 'cd {0} && git tag "{1}" && git push origin "{1}"'
+               .format(path, tag_name)]
     if not exec_command_and_print_error(command):
         input("Something bad happened! Try to fix it and then press ENTER to continue...")
 
@@ -400,11 +401,10 @@ def build_docs(repo_name, temp_dir, extra_path, crate_name):
     # Copy source files
     destination = "{}/src".format(join(temp_dir, consts.DOC_REPO))
     command = ['bash', '-c',
-               'cd {} && mkdir -p "{}" && cp -r "src/{}" "{}/"'
+               'cd {0} && mkdir -p "{1}" && cp -r "src/{2}" "{1}/"'
                .format(doc_folder,
                        destination,
-                       crate_name.replace('-', '_'),
-                       destination)]
+                       crate_name.replace('-', '_'))]
     if not exec_command_and_print_error(command):
         input("Couldn't copy doc source files! Try to fix it and then press ENTER to continue...")
     search_index = join(path, 'target/doc/search-index.js')
@@ -435,7 +435,6 @@ def end_docs_build(temp_dir):
     revert_changes(consts.DOC_REPO, temp_dir,
                    ['COPYRIGHT.txt', 'LICENSE-APACHE.txt', 'LICENSE-MIT.txt'])
     try:
-        lines = get_file_content(join(path, 'search-index.js')).split('\n')
         with open(join(path, 'search-index.js'), 'w') as f:
             f.write('\n'.join(SEARCH_INDEX_BEFORE))
             f.write('\n'.join(SEARCH_INDEX))
@@ -446,7 +445,7 @@ def end_docs_build(temp_dir):
             input("Couldn't run minifier! Try to fix it and then press ENTER to continue...")
         add_to_commit(consts.DOC_REPO, temp_dir, ['.'])
     except Exception as e:
-        print('An exception occured in "end_docs_build": {}'.format(e))
+        write_error('An exception occured in "end_docs_build": {}'.format(e))
         input("Press ENTER to continue...")
 
 
@@ -534,15 +533,14 @@ For the interested ones, here is the list of the merged pull requests:
 
 
 def generate_new_tag(repository, temp_dir, specified_crate):
-    versions = {}
-    version = None
-
     # We make a new tag for every crate:
     #
     # * If it is a "sys" crate, then we add its name to the tag
     # * If not, then we just keep its version number
     for crate in consts.CRATE_LIST:
         if crate['repository'] == repository:
+            if specified_crate is not None and crate['crate'] != specified_crate:
+                continue
             tag_name = CRATES_VERSION[crate['crate']]
             if crate['crate'].endswith('-sys') or crate['crate'].endswith('-sys-rs'):
                 tag_name = '{}-{}'.format(crate['crate'], tag_name)
@@ -773,7 +771,8 @@ def write_help():
     write_msg(" * -m <mode> | --mode=<mode>    : give the update type (MINOR|MEDIUM|MAJOR)")
     write_msg(" * --no-push                    : performs all operations but doesn't push anything")
     write_msg(" * --doc-only                   : only builds documentation")
-    write_msg(" * -c <crate> | --crate=<crate> : only update the given crate (for test purpose mainly)")
+    write_msg(" * -c <crate> | --crate=<crate> : only update the given crate (for test purpose"
+              " mainly)")
     write_msg(" * --badges-only                : only update the badges on the website")
     write_msg(" * --tags-only                  : only create new tags")
 
