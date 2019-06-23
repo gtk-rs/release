@@ -452,7 +452,7 @@ def end_docs_build(temp_dir):
 
 def write_merged_prs(merged_prs, contributors, repo_url):
     content = ''
-    for pr in merged_prs:
+    for pr in reversed(merged_prs):
         if pr.title.startswith('[release] '):
             continue
         if pr.author not in contributors:
