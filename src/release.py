@@ -514,6 +514,8 @@ For the interested ones, here is the list of the merged pull requests:
         content += write_merged_prs(merged_prs, contributors, repo_url)
 
     content += 'Thanks to all of our contributors for their (awesome!) work on this release:\n\n'
+    # Sort contributors list alphabetically with case insensitive.
+    contributors = sorted(contributors, key=lambda s: s.casefold())
     content += '\n'.join([' * [@{}]({}/{})'.format(contributor, consts.GITHUB_URL, contributor)
                           for contributor in contributors])
     content += '\n'
