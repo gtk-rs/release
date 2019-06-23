@@ -267,8 +267,30 @@ def publish_crate(repository, crate_dir_path, temp_dir, crate_name, checkout_bra
     # In case we needed to fix bugs, we checkout to crate branch before publishing crate.
     command = ['bash', '-c', 'cd {} && git checkout {} && cargo publish'.format(path,
                                                                                 checkout_branch)]
-    if not exec_command_and_print_error(command):
-        input("Something bad happened! Try to fix it and then press ENTER to continue...")
+    retry = 3
+    error_messages = []
+    final_success = False
+    wait_time = 30
+    while retry > 0:
+        ret, stdout, stderr = exec_command(command, timeout=timeout)
+        if not ret:
+            error_messages.append('Command "{}" failed:'.format(' '.join(command)))
+            if len(stdout) > 0:
+                error_messages[len(error_messages) - 1] += '\n=== STDOUT ===\n{}\n'.format(stdout)
+            if len(stderr) > 0:
+                error_messages[len(error_messages) - 1] += '\n=== STDERR ===\n{}\n'.format(stderr)
+            retry -= 1
+            if retry > 0:
+                write_msg("Let's sleep for {} seconds before retrying, {} retr{} remaining..."
+                          .format(wait_time, retry + 1, 'ies' if retry > 0 else 'y'))
+                time.sleep(wait_time)
+        else:
+            final_success = True
+            break
+        if final_success is False:
+            errors = set(error_messages)
+            write_msg('== ERRORS ==\n{}'.format('====\n'.join(errors)))
+            input("Something bad happened! Try to fix it and then press ENTER to continue...")
     write_msg('> crate {} has been published'.format(crate_name))
 
 
