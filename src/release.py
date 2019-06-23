@@ -530,7 +530,9 @@ def generate_new_tag(repository, temp_dir, specified_crate):
 def update_doc_content_repository(repositories, temp_dir, token, no_push):
     if clone_repo(consts.DOC_CONTENT_REPO, temp_dir) is False:
         input('Try to fix the problem then press ENTER to continue...')
+    write_msg("Done!")
     repo_path = join(temp_dir, consts.DOC_CONTENT_REPO)
+    write_msg("=> Generating documentation for crates...")
     for repo in repositories:
         current = None
         for crate in consts.CRATE_LIST:
@@ -542,6 +544,7 @@ def update_doc_content_repository(repositories, temp_dir, token, no_push):
             continue
         if current.get("doc", True) is False:
             continue
+        write_msg('==> Generating documentation for "{}"'.format(current))
         path = join(temp_dir, current['repository'])
         command = ['bash', '-c',
                    'cd {} && make doc && mv vendor.md {}'.format(path,
@@ -549,6 +552,7 @@ def update_doc_content_repository(repositories, temp_dir, token, no_push):
                                                                       current['crate']))]
         if not exec_command_and_print_error(command):
             input("Fix the error and then press ENTER")
+    write_msg('Done!')
     write_msg('Committing "{}" changes...'.format(consts.DOC_CONTENT_REPO))
     commit(consts.DOC_CONTENT_REPO, temp_dir, "Update vendor files")
     if no_push is False:
