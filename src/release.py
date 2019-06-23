@@ -261,11 +261,12 @@ def merging_branches(repo_name, temp_dir, merge_branch):
         input("Fix the error and then press ENTER")
 
 
-def publish_crate(repository, crate_dir_path, temp_dir, crate_name):
+def publish_crate(repository, crate_dir_path, temp_dir, crate_name, checkout_branch='crate'):
     write_msg('=> publishing crate {}'.format(crate_name))
     path = join(join(temp_dir, repository), crate_dir_path)
     # In case we needed to fix bugs, we checkout to crate branch before publishing crate.
-    command = ['bash', '-c', 'cd {} && git checkout crate && cargo publish'.format(path)]
+    command = ['bash', '-c', 'cd {} && git checkout {} && cargo publish'.format(path,
+                                                                                checkout_branch)]
     if not exec_command_and_print_error(command):
         input("Something bad happened! Try to fix it and then press ENTER to continue...")
     write_msg('> crate {} has been published'.format(crate_name))
@@ -566,7 +567,8 @@ def update_doc_content_repository(repositories, temp_dir, token, no_push):
                             False)
         input('All done with the "{}" update: please merge the PR then press ENTER so the \
                publication can performed...'.format(consts.DOC_CONTENT_REPO))
-        publish_crate(consts.DOC_CONTENT_REPO, "", temp_dir, consts.DOC_CONTENT_REPO)
+        publish_crate(consts.DOC_CONTENT_REPO, "", temp_dir, consts.DOC_CONTENT_REPO,
+                      checkout_branch='master')
         write_msg('Ok all done! We can move forward now!')
     else:
         write_msg('All with "{}", you still need to publish a new version if you want the changes \
