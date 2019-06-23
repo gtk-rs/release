@@ -354,8 +354,8 @@ def build_docs(repo_name, temp_dir, extra_path, crate_name):
     # Also, we run "cargo update" in case the lgpl-docs repository has been updated (so we get the
     # last version).
     command = ['bash', '-c',
-               'cd {} && cargo update && cargo rustdoc --no-default-features --features "{}" -- \
-                -Z unstable-options --disable-minification'.format(path, features)]
+               ('cd {} && cargo update && cargo rustdoc --no-default-features --features "{}" -- '
+                '-Z unstable-options --disable-minification').format(path, features)]
     if not exec_command_and_print_error(command):
         input("Couldn't generate docs! Try to fix it and then press ENTER to continue...")
     doc_folder = join(path, 'target/doc')
@@ -565,14 +565,14 @@ def update_doc_content_repository(repositories, temp_dir, token, no_push):
         push(consts.DOC_CONTENT_REPO, temp_dir, consts.MASTER_TMP_BRANCH)
         create_pull_request(consts.DOC_CONTENT_REPO, consts.MASTER_TMP_BRANCH, "master", token,
                             False)
-        input('All done with the "{}" update: please merge the PR then press ENTER so the \
-               publication can performed...'.format(consts.DOC_CONTENT_REPO))
+        input(('All done with the "{}" update: please merge the PR then press ENTER so the '
+               'publication can performed...').format(consts.DOC_CONTENT_REPO))
         publish_crate(consts.DOC_CONTENT_REPO, "", temp_dir, consts.DOC_CONTENT_REPO,
                       checkout_branch='master')
         write_msg('Ok all done! We can move forward now!')
     else:
-        write_msg('All with "{}", you still need to publish a new version if you want the changes \
-                   to be taken into account'.format(consts.DOC_CONTENT_REPO))
+        write_msg(('All with "{}", you still need to publish a new version if you want the changes '
+                   'to be taken into account').format(consts.DOC_CONTENT_REPO))
 
 
 def start(update_type, token, no_push, doc_only, specified_crate, badges_only, tags_only):
