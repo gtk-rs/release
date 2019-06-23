@@ -1,4 +1,3 @@
-import consts
 from os.path import join
 from my_toml import TomlHandler
 import json
@@ -6,6 +5,8 @@ import subprocess
 import sys
 # pip3 install requests
 import requests
+# local i;port
+import consts
 
 
 def write_error(error_msg):
@@ -104,8 +105,8 @@ def post_content(url, token, details, method='post', header_extras={}):
             r = requests.put(url, data=json.dumps(details), headers=headers)
         try:
             r.raise_for_status()
-        except:
-            print('Sent by bithub api: {}'.format(r.json()))
+        except Exception:
+            write_msg('Sent by bithub api: {}'.format(r.json()))
             r.raise_for_status()
         return r.json()
     except Exception as e:
@@ -126,7 +127,7 @@ def get_highest_feature_version(v1, v2):
             elif x1 < x2:
                 return v2
             i += 1
-        except:
+        except Exception:
             write_error('get_highest_feature_version int conversion error: int("{}") vs int("{}")'
                         ' from "{}" and "{}"'.format(t_v1[i], t_v2[i], v1, v2))
             break
@@ -163,10 +164,11 @@ def get_features(path):
         if 'dox' not in features:
             features.append('dox')
     elif highest_version is not None:
-        print("/!\\ Seems there is no dox feature so let's just use the highest version instead...")
+        write_msg("/!\\ Seems there is no dox feature so let's just use the highest version "
+                  "instead...")
         features.append(highest_version)
     else:
-        print("/!\\ That's weird: no dox or version feature. Is everything fine with this one?")
+        write_msg("/!\\ That's weird: no dox or version feature. Is everything fine with this one?")
     return ' '.join(features)
 
 def compare_versions(v1, v2):
@@ -177,7 +179,7 @@ def compare_versions(v1, v2):
         try:
             entry1 = int(v1)
             entry2 = int(v2)
-        except:
+        except Exception:
             # If it cannot be converted into a number, better just compare strings then.
             entry1 = v1
             entry2 = v2
