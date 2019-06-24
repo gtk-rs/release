@@ -447,6 +447,8 @@ def end_docs_build(temp_dir):
     except Exception as e:
         write_error('An exception occured in "end_docs_build": {}'.format(e))
         input("Press ENTER to continue...")
+    input('If you want to prevent "{}" to be updated, now is the good time! Press ENTER to '
+          'continue...'.format(join(path, "main.js")))
 
 
 def write_merged_prs(merged_prs, contributors, repo_url):
