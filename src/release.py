@@ -218,7 +218,7 @@ def commit(repo_name, temp_dir, commit_msg):
 
 def push(repo_name, temp_dir, target_branch):
     repo_path = join(temp_dir, repo_name)
-    command = ['bash', '-c', 'cd {} && git push -f origin HEAD:{}'.format(repo_path, target_branch)]
+    command = ['bash', '-c', 'cd {} && git push origin HEAD:{}'.format(repo_path, target_branch)]
     if not exec_command_and_print_error(command):
         input("Fix the error and then press ENTER")
 
@@ -551,6 +551,23 @@ def generate_new_tag(repository, temp_dir, specified_crate):
             create_tag_and_push(tag_name, repository, temp_dir)
 
 
+def generate_new_branches(repository, temp_dir, specified_crate):
+    # We make a new branch for every crate based on the current "crate" branch:
+    #
+    # * If it is a "sys" crate, then we ignore it.
+    # * If not, then we create a new branch
+    for crate in consts.CRATE_LIST:
+        if crate['repository'] == repository:
+            if specified_crate is not None and crate['crate'] != specified_crate:
+                continue
+            if crate['crate'].endswith('-sys') or crate['crate'].endswith('-sys-rs'):
+                continue
+            branch_name = CRATES_VERSION[crate['crate']]
+            write_msg('==> Creating new branch "{}" for repository "{}"...'.format(branch_name,
+                                                                                   repository))
+            push(repository, temp_dir, branch_name)
+
+
 def update_doc_content_repository(repositories, temp_dir, token, no_push):
     if clone_repo(consts.DOC_CONTENT_REPO, temp_dir) is False:
         input('Try to fix the problem then press ENTER to continue...')
@@ -716,9 +733,10 @@ def start(update_type, token, no_push, doc_only, specified_crate, badges_only, t
                 write_msg('Done!')
 
         if no_push is False and doc_only is False and badges_only is False:
-            write_msg("=> Generating tags...")
+            write_msg("=> Generating tags and branches...")
             for repo in repositories:
                 generate_new_tag(repo, temp_dir, specified_crate)
+                generate_new_branches(repo, temp_dir, specified_crate)
             write_msg('Done!')
 
         if badges_only is False and tags_only is False:
