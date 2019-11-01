@@ -9,7 +9,9 @@ from os.path import isdir, isfile, join
 from my_toml import TomlHandler
 from utils import clone_repo, compare_versions, exec_command, exec_command_and_print_error
 from utils import get_features, get_file_content, post_content, write_error, write_into_file
-from utils import write_msg
+from utils import add_to_commit, commit, commit_and_push, push, revert_changes, write_msg
+from utils import checkout_target_branch, get_last_commit_date, merging_branches, publish_crate
+from utils import create_tag_and_push
 import consts
 import errno
 import getopt
@@ -54,6 +56,34 @@ def TemporaryDirectory():
             # if the directory has already been removed, no need to raise an error
             if e.errno != errno.ENOENT:
                 raise
+
+
+def create_pull_request(repo_name, from_branch, target_branch, token, add_to_list=True):
+    r = post_content('{}/repos/{}/{}/pulls'.format(consts.GH_API_URL, consts.ORGANIZATION,
+                                                   repo_name),
+                     token,
+                     {'title': '[release] merging {} into {}'.format(from_branch, target_branch),
+                      'body': 'cc @GuillaumeGomez @EPashkin @sdroege',
+                      'base': target_branch,
+                      'head': from_branch,
+                      'maintainer_can_modify': True})
+    if r is None:
+        write_error("Pull request from {repo}/{from_b} to {repo}/{target} couldn't be created. You "
+                    "need to do it yourself... (url provided at the end)"
+                    .format(repo=repo_name,
+                            from_b=from_branch,
+                            target=target_branch))
+        input("Press ENTER once done to continue...")
+        PULL_REQUESTS.append('|=> "{}/{}/{}/compare/{}...{}?expand=1"'
+                             .format(consts.GITHUB_URL,
+                                     consts.ORGANIZATION,
+                                     repo_name,
+                                     target_branch,
+                                     from_branch))
+    else:
+        write_msg("===> Pull request created: {}".format(r['html_url']))
+        if add_to_list is True:
+            PULL_REQUESTS.append('> {}'.format(r['html_url']))
 
 
 def update_version(version, update_type, section_name, place_type="section"):
@@ -202,141 +232,6 @@ def update_repo_version(repo_name, crate_name, crate_dir_path, temp_dir, update_
         write_msg('=> {}: {}'.format(output.split(os_sep)[-2],
                                      'Failure' if result is False else 'Success'))
     return result
-
-
-def commit_and_push(repo_name, temp_dir, commit_msg, target_branch):
-    commit(repo_name, temp_dir, commit_msg)
-    push(repo_name, temp_dir, target_branch)
-
-
-def commit(repo_name, temp_dir, commit_msg):
-    repo_path = join(temp_dir, repo_name)
-    command = ['bash', '-c', 'cd {} && git commit . -m "{}"'.format(repo_path, commit_msg)]
-    if not exec_command_and_print_error(command):
-        input("Fix the error and then press ENTER")
-
-
-def push(repo_name, temp_dir, target_branch):
-    repo_path = join(temp_dir, repo_name)
-    command = ['bash', '-c', 'cd {} && git push -f origin HEAD:{}'.format(repo_path, target_branch)]
-    if not exec_command_and_print_error(command):
-        input("Fix the error and then press ENTER")
-
-
-def add_to_commit(repo_name, temp_dir, files_to_add):
-    repo_path = join(temp_dir, repo_name)
-    command = ['bash', '-c', 'cd {} && git add {}'
-               .format(repo_path, ' '.join(['"{}"'.format(f) for f in files_to_add]))]
-    if not exec_command_and_print_error(command):
-        input("Fix the error and then press ENTER")
-
-
-def revert_changes(repo_name, temp_dir, files):
-    repo_path = join(temp_dir, repo_name)
-    command = ['bash', '-c',
-               'cd {} && git checkout -- {}'.format(repo_path,
-                                                    ' '.join(['"{}"'.format(f) for f in files]))]
-    if not exec_command_and_print_error(command):
-        input("Fix the error and then press ENTER")
-
-
-def checkout_target_branch(repo_name, temp_dir, target_branch):
-    repo_path = join(temp_dir, repo_name)
-    command = ['bash', '-c', 'cd {} && git checkout {}'.format(repo_path, target_branch)]
-    if not exec_command_and_print_error(command):
-        input("Fix the error and then press ENTER")
-
-
-def get_last_commit_date(repo_name, temp_dir):
-    repo_path = join(temp_dir, repo_name)
-    success, out, err = exec_command(['bash', '-c',
-                                      'cd {} && git log --format=%at --no-merges -n 1'.format(
-                                          repo_path)
-                                      ])
-    return (success, out, err)
-
-
-def merging_branches(repo_name, temp_dir, merge_branch):
-    repo_path = join(temp_dir, repo_name)
-    command = ['bash', '-c', 'cd {} && git merge "origin/{}"'.format(repo_path, merge_branch)]
-    if not exec_command_and_print_error(command):
-        input("Fix the error and then press ENTER")
-
-
-def publish_crate(repository, crate_dir_path, temp_dir, crate_name, checkout_branch='crate'):
-    write_msg('=> publishing crate {}'.format(crate_name))
-    path = join(join(temp_dir, repository), crate_dir_path)
-    # In case we needed to fix bugs, we checkout to crate branch before publishing crate.
-    command = ['bash', '-c', 'cd {} && git checkout {} && cargo publish'.format(path,
-                                                                                checkout_branch)]
-    retry = 3
-    error_messages = []
-    final_success = False
-    wait_time = 30
-    while retry > 0:
-        ret, stdout, stderr = exec_command(command)
-        if not ret:
-            error_messages.append('Command "{}" failed:'.format(' '.join(command)))
-            if len(stdout) > 0:
-                error_messages[len(error_messages) - 1] += '\n=== STDOUT ===\n{}\n'.format(stdout)
-            if len(stderr) > 0:
-                error_messages[len(error_messages) - 1] += '\n=== STDERR ===\n{}\n'.format(stderr)
-            retry -= 1
-            if retry > 0:
-                write_msg("Let's sleep for {} seconds before retrying, {} retr{} remaining..."
-                          .format(wait_time, retry + 1, 'ies' if retry > 0 else 'y'))
-                time.sleep(wait_time)
-        else:
-            final_success = True
-            break
-        if final_success is False:
-            errors = set(error_messages)
-            write_msg('== ERRORS ==\n{}'.format('====\n'.join(errors)))
-            input("Something bad happened! Try to fix it and then press ENTER to continue...")
-    write_msg('> crate {} has been published'.format(crate_name))
-
-
-def create_tag_and_push(tag_name, repository, temp_dir):
-    path = join(temp_dir, repository)
-    command = ['bash', '-c', 'cd {0} && git tag "{1}" && git push origin "{1}"'
-               .format(path, tag_name)]
-    if not exec_command_and_print_error(command):
-        input("Something bad happened! Try to fix it and then press ENTER to continue...")
-
-
-def push_tag(tag_name, repository, temp_dir):
-    path = join(temp_dir, repository)
-    command = ['bash', '-c', 'cd {} && git push origin "{}"'.format(path, tag_name)]
-    if not exec_command_and_print_error(command):
-        input("Something bad happened! Try to fix it and then press ENTER to continue...")
-
-
-def create_pull_request(repo_name, from_branch, target_branch, token, add_to_list=True):
-    r = post_content('{}/repos/{}/{}/pulls'.format(consts.GH_API_URL, consts.ORGANIZATION,
-                                                   repo_name),
-                     token,
-                     {'title': '[release] merging {} into {}'.format(from_branch, target_branch),
-                      'body': 'cc @GuillaumeGomez @EPashkin @sdroege',
-                      'base': target_branch,
-                      'head': from_branch,
-                      'maintainer_can_modify': True})
-    if r is None:
-        write_error("Pull request from {repo}/{from_b} to {repo}/{target} couldn't be created. You "
-                    "need to do it yourself... (url provided at the end)"
-                    .format(repo=repo_name,
-                            from_b=from_branch,
-                            target=target_branch))
-        input("Press ENTER once done to continue...")
-        PULL_REQUESTS.append('|=> "{}/{}/{}/compare/{}...{}?expand=1"'
-                             .format(consts.GITHUB_URL,
-                                     consts.ORGANIZATION,
-                                     repo_name,
-                                     target_branch,
-                                     from_branch))
-    else:
-        write_msg("===> Pull request created: {}".format(r['html_url']))
-        if add_to_list is True:
-            PULL_REQUESTS.append('> {}'.format(r['html_url']))
 
 
 def update_badges(repo_name, temp_dir, specified_crate):
@@ -551,6 +446,23 @@ def generate_new_tag(repository, temp_dir, specified_crate):
             create_tag_and_push(tag_name, repository, temp_dir)
 
 
+def generate_new_branches(repository, temp_dir, specified_crate):
+    # We make a new branch for every crate based on the current "crate" branch:
+    #
+    # * If it is a "sys" crate, then we ignore it.
+    # * If not, then we create a new branch
+    for crate in consts.CRATE_LIST:
+        if crate['repository'] == repository:
+            if specified_crate is not None and crate['crate'] != specified_crate:
+                continue
+            if crate['crate'].endswith('-sys') or crate['crate'].endswith('-sys-rs'):
+                continue
+            branch_name = CRATES_VERSION[crate['crate']]
+            write_msg('==> Creating new branch "{}" for repository "{}"...'.format(branch_name,
+                                                                                   repository))
+            push(repository, temp_dir, branch_name)
+
+
 def update_doc_content_repository(repositories, temp_dir, token, no_push):
     if clone_repo(consts.DOC_CONTENT_REPO, temp_dir) is False:
         input('Try to fix the problem then press ENTER to continue...')
@@ -716,9 +628,10 @@ def start(update_type, token, no_push, doc_only, specified_crate, badges_only, t
                 write_msg('Done!')
 
         if no_push is False and doc_only is False and badges_only is False:
-            write_msg("=> Generating tags...")
+            write_msg("=> Generating tags and branches...")
             for repo in repositories:
                 generate_new_tag(repo, temp_dir, specified_crate)
+                generate_new_branches(repo, temp_dir, specified_crate)
             write_msg('Done!')
 
         if badges_only is False and tags_only is False:

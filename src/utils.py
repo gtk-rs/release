@@ -3,6 +3,7 @@ from my_toml import TomlHandler
 import json
 import subprocess
 import sys
+import time
 # pip3 install requests
 import requests
 # local i;port
@@ -171,6 +172,7 @@ def get_features(path):
         write_msg("/!\\ That's weird: no dox or version feature. Is everything fine with this one?")
     return ' '.join(features)
 
+
 def compare_versions(v1, v2):
     v1 = v1.split('.')
     v2 = v2.split('.')
@@ -189,3 +191,103 @@ def compare_versions(v1, v2):
             return -1
     # In here, "3.2" is considered littler than "3.2.0". That's how life goes.
     return len(v1) - len(v2)
+
+
+def commit_and_push(repo_name, temp_dir, commit_msg, target_branch):
+    commit(repo_name, temp_dir, commit_msg)
+    push(repo_name, temp_dir, target_branch)
+
+
+def commit(repo_name, temp_dir, commit_msg):
+    repo_path = join(temp_dir, repo_name)
+    command = ['bash', '-c', 'cd {} && git commit . -m "{}"'.format(repo_path, commit_msg)]
+    if not exec_command_and_print_error(command):
+        input("Fix the error and then press ENTER")
+
+
+def push(repo_name, temp_dir, target_branch):
+    repo_path = join(temp_dir, repo_name)
+    command = ['bash', '-c', 'cd {} && git push origin HEAD:{}'.format(repo_path, target_branch)]
+    if not exec_command_and_print_error(command):
+        input("Fix the error and then press ENTER")
+
+
+def add_to_commit(repo_name, temp_dir, files_to_add):
+    repo_path = join(temp_dir, repo_name)
+    command = ['bash', '-c', 'cd {} && git add {}'
+               .format(repo_path, ' '.join(['"{}"'.format(f) for f in files_to_add]))]
+    if not exec_command_and_print_error(command):
+        input("Fix the error and then press ENTER")
+
+
+def revert_changes(repo_name, temp_dir, files):
+    repo_path = join(temp_dir, repo_name)
+    command = ['bash', '-c',
+               'cd {} && git checkout -- {}'.format(repo_path,
+                                                    ' '.join(['"{}"'.format(f) for f in files]))]
+    if not exec_command_and_print_error(command):
+        input("Fix the error and then press ENTER")
+
+
+def checkout_target_branch(repo_name, temp_dir, target_branch):
+    repo_path = join(temp_dir, repo_name)
+    command = ['bash', '-c', 'cd {} && git checkout {}'.format(repo_path, target_branch)]
+    if not exec_command_and_print_error(command):
+        input("Fix the error and then press ENTER")
+
+
+def get_last_commit_date(repo_name, temp_dir):
+    repo_path = join(temp_dir, repo_name)
+    success, out, err = exec_command(['bash', '-c',
+                                      'cd {} && git log --format=%at --no-merges -n 1'.format(
+                                          repo_path)
+                                      ])
+    return (success, out, err)
+
+
+def merging_branches(repo_name, temp_dir, merge_branch):
+    repo_path = join(temp_dir, repo_name)
+    command = ['bash', '-c', 'cd {} && git merge "origin/{}"'.format(repo_path, merge_branch)]
+    if not exec_command_and_print_error(command):
+        input("Fix the error and then press ENTER")
+
+
+def publish_crate(repository, crate_dir_path, temp_dir, crate_name, checkout_branch='crate'):
+    write_msg('=> publishing crate {}'.format(crate_name))
+    path = join(join(temp_dir, repository), crate_dir_path)
+    # In case we needed to fix bugs, we checkout to crate branch before publishing crate.
+    command = ['bash', '-c', 'cd {} && git checkout {} && cargo publish'.format(path,
+                                                                                checkout_branch)]
+    retry = 3
+    error_messages = []
+    final_success = False
+    wait_time = 30
+    while retry > 0:
+        ret, stdout, stderr = exec_command(command)
+        if not ret:
+            error_messages.append('Command "{}" failed:'.format(' '.join(command)))
+            if len(stdout) > 0:
+                error_messages[len(error_messages) - 1] += '\n=== STDOUT ===\n{}\n'.format(stdout)
+            if len(stderr) > 0:
+                error_messages[len(error_messages) - 1] += '\n=== STDERR ===\n{}\n'.format(stderr)
+            retry -= 1
+            if retry > 0:
+                write_msg("Let's sleep for {} seconds before retrying, {} retr{} remaining..."
+                          .format(wait_time, retry + 1, 'ies' if retry > 0 else 'y'))
+                time.sleep(wait_time)
+        else:
+            final_success = True
+            break
+        if final_success is False:
+            errors = set(error_messages)
+            write_msg('== ERRORS ==\n{}'.format('====\n'.join(errors)))
+            input("Something bad happened! Try to fix it and then press ENTER to continue...")
+    write_msg('> crate {} has been published'.format(crate_name))
+
+
+def create_tag_and_push(tag_name, repository, temp_dir):
+    path = join(temp_dir, repository)
+    command = ['bash', '-c', 'cd {0} && git tag "{1}" && git push origin "{1}"'
+               .format(path, tag_name)]
+    if not exec_command_and_print_error(command):
+        input("Something bad happened! Try to fix it and then press ENTER to continue...")
