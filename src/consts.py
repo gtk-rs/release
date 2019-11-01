@@ -1,3 +1,5 @@
+# pylint: disable=bad-whitespace
+
 GH_API_URL = 'https://api.github.com'
 GITHUB_URL = "https://github.com"
 

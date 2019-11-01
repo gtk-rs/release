@@ -1,13 +1,14 @@
 from os.path import join
-from my_toml import TomlHandler
 import json
 import subprocess
 import sys
 import time
 # pip3 install requests
 import requests
-# local i;port
-import consts
+# local import
+from . import consts
+from .globals import PULL_REQUESTS
+from .my_toml import TomlHandler
 
 
 def write_error(error_msg):
@@ -18,28 +19,28 @@ def write_msg(msg):
     sys.stdout.write('{}\n'.format(msg))
 
 
-def convert_to_string(s):
-    if s.__class__.__name__ == 'bytes':
-        return s.decode('utf-8')
-    return s
+def convert_to_string(content):
+    if content.__class__.__name__ == 'bytes':
+        return content.decode('utf-8')
+    return content
 
 
 def get_file_content(file_path):
     try:
-        with open(file_path, 'r') as fd:
-            return fd.read()
-    except Exception as e:
-        write_error('get_file_content failed: "{}": {}'.format(file_path, e))
+        with open(file_path, 'r') as file:
+            return file.read()
+    except Exception as err:
+        write_error('get_file_content failed: "{}": {}'.format(file_path, err))
     return None
 
 
 def write_into_file(file_path, content):
     try:
-        with open(file_path, 'w') as fd:
-            fd.write(content)
+        with open(file_path, 'w') as file:
+            file.write(content)
             return True
-    except Exception as e:
-        write_error('write_into_file failed: "{}": {}'.format(file_path, e))
+    except Exception as err:
+        write_error('write_into_file failed: "{}": {}'.format(file_path, err))
     return False
 
 
@@ -73,13 +74,16 @@ def clone_repo(repo_name, temp_dir, depth=None):
             command = ['git', 'clone', '--depth', '{}'.format(depth), repo_url, target_dir]
         ret, stdout, stderr = exec_command(command, timeout=300)
         if not ret:
-            write_error('command "{}" failed: {}'.format(' '.join(command), stderr))
+            write_error('command "{}" failed: ===STDOUT===\n{}\n===STDERR===\n{}'.format(
+                ' '.join(command),
+                stdout,
+                stderr))
             return False
         return True
     except subprocess.TimeoutExpired:
         write_error('command timed out: {}'.format(' '.join(command)))
-    except Exception as ex:
-        write_error('command "{}" got an exception: {}'.format(' '.join(command), ex))
+    except Exception as err:
+        write_error('command "{}" got an exception: {}'.format(' '.join(command), err))
     return False
 
 
@@ -94,45 +98,47 @@ def create_headers(token):
     return headers
 
 
-def post_content(url, token, details, method='post', header_extras={}):
+def post_content(url, token, details, method='post', header_extras=None):
+    if header_extras is None:
+        header_extras = {}
     headers = create_headers(token)
     for extra in header_extras:
         headers[extra] = header_extras[extra]
     try:
-        r = None
+        req = None
         if method == 'post':
-            r = requests.post(url, data=json.dumps(details), headers=headers)
+            req = requests.post(url, data=json.dumps(details), headers=headers)
         else:
-            r = requests.put(url, data=json.dumps(details), headers=headers)
+            req = requests.put(url, data=json.dumps(details), headers=headers)
         try:
-            r.raise_for_status()
+            req.raise_for_status()
         except Exception:
-            write_msg('Sent by bithub api: {}'.format(r.json()))
-            r.raise_for_status()
-        return r.json()
-    except Exception as e:
-        write_error('post_content: An error occurred: {}'.format(e))
+            write_msg('Sent by bithub api: {}'.format(req.json()))
+            req.raise_for_status()
+        return req.json()
+    except Exception as err:
+        write_error('post_content: An error occurred: {}'.format(err))
     return None
 
 
-def get_highest_feature_version(v1, v2):
-    t_v1 = v1[1:].split('_')
-    t_v2 = v2[1:].split('_')
+def get_highest_feature_version(v1_feature, v2_feature):
+    t_v1 = v1_feature[1:].split('_')
+    t_v2 = v2_feature[1:].split('_')
     i = 0
     while i < len(t_v1) and i < len(t_v2):
         try:
-            x1 = int(t_v1[i])
-            x2 = int(t_v2[i])
-            if x1 > x2:
-                return v1
-            elif x1 < x2:
-                return v2
+            x1_version = int(t_v1[i])
+            x2_version = int(t_v2[i])
+            if x1_version > x2_version:
+                return v1_feature
+            elif x1_version < x2_version:
+                return v2_feature
             i += 1
         except Exception:
             write_error('get_highest_feature_version int conversion error: int("{}") vs int("{}")'
-                        ' from "{}" and "{}"'.format(t_v1[i], t_v2[i], v1, v2))
+                        ' from "{}" and "{}"'.format(t_v1[i], t_v2[i], v1_feature, v2_feature))
             break
-    return v1
+    return v1_feature
 
 
 # This function does two things:
@@ -140,6 +146,7 @@ def get_highest_feature_version(v1, v2):
 # 1. Check if dox feature is present or try getting the highest version feature
 # 2. Getting all the other features (for cairo it's very important)
 def get_features(path):
+    # pylint: disable=too-many-branches
     features = []
     highest_version = None
     content = get_file_content(path)
@@ -173,24 +180,24 @@ def get_features(path):
     return ' '.join(features)
 
 
-def compare_versions(v1, v2):
-    v1 = v1.split('.')
-    v2 = v2.split('.')
-
-    for x in range(0, min(len(v1), len(v2))):
-        try:
-            entry1 = int(v1)
-            entry2 = int(v2)
-        except Exception:
-            # If it cannot be converted into a number, better just compare strings then.
-            entry1 = v1
-            entry2 = v2
-        if entry1 > entry2:
-            return 1
-        if entry1 < entry2:
-            return -1
-    # In here, "3.2" is considered littler than "3.2.0". That's how life goes.
-    return len(v1) - len(v2)
+# def compare_versions(v1, v2):
+#     v1 = v1.split('.')
+#     v2 = v2.split('.')
+#
+#     for x in range(0, min(len(v1), len(v2))):
+#         try:
+#             entry1 = int(v1)
+#             entry2 = int(v2)
+#         except Exception:
+#             # If it cannot be converted into a number, better just compare strings then.
+#             entry1 = v1
+#             entry2 = v2
+#         if entry1 > entry2:
+#             return 1
+#         if entry1 < entry2:
+#             return -1
+#     # In here, "3.2" is considered littler than "3.2.0". That's how life goes.
+#     return len(v1) - len(v2)
 
 
 def commit_and_push(repo_name, temp_dir, commit_msg, target_branch):
@@ -241,7 +248,7 @@ def get_last_commit_date(repo_name, temp_dir):
     success, out, err = exec_command(['bash', '-c',
                                       'cd {} && git log --format=%at --no-merges -n 1'.format(
                                           repo_path)
-                                      ])
+                                     ])
     return (success, out, err)
 
 
@@ -291,3 +298,31 @@ def create_tag_and_push(tag_name, repository, temp_dir):
                .format(path, tag_name)]
     if not exec_command_and_print_error(command):
         input("Something bad happened! Try to fix it and then press ENTER to continue...")
+
+
+def create_pull_request(repo_name, from_branch, target_branch, token, add_to_list=True):
+    req = post_content('{}/repos/{}/{}/pulls'.format(consts.GH_API_URL, consts.ORGANIZATION,
+                                                     repo_name),
+                       token,
+                       {'title': '[release] merging {} into {}'.format(from_branch, target_branch),
+                        'body': 'cc @GuillaumeGomez @EPashkin @sdroege',
+                        'base': target_branch,
+                        'head': from_branch,
+                        'maintainer_can_modify': True})
+    if req is None:
+        write_error("Pull request from {repo}/{from_b} to {repo}/{target} couldn't be created. You "
+                    "need to do it yourself... (url provided at the end)"
+                    .format(repo=repo_name,
+                            from_b=from_branch,
+                            target=target_branch))
+        input("Press ENTER once done to continue...")
+        PULL_REQUESTS.append('|=> "{}/{}/{}/compare/{}...{}?expand=1"'
+                             .format(consts.GITHUB_URL,
+                                     consts.ORGANIZATION,
+                                     repo_name,
+                                     target_branch,
+                                     from_branch))
+    else:
+        write_msg("===> Pull request created: {}".format(req['html_url']))
+        if add_to_list is True:
+            PULL_REQUESTS.append('> {}'.format(req['html_url']))
