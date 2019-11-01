@@ -12,7 +12,7 @@ import tempfile
 from os import listdir, sep as os_sep
 from os.path import isdir, isfile, join
 # local imports
-import consts
+from . import consts
 from .github import Github
 from .globals import CRATES_VERSION, PULL_REQUESTS, SEARCH_INDEX, SEARCH_INDEX_BEFORE
 from .globals import SEARCH_INDEX_AFTER

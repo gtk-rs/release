@@ -6,7 +6,7 @@ import time
 # pip3 install requests
 import requests
 # local import
-import consts
+from . import consts
 from .globals import PULL_REQUESTS
 from .my_toml import TomlHandler
 
