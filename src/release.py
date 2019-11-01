@@ -4,7 +4,6 @@ from contextlib import contextmanager
 # pip3 install datetime
 import datetime
 import errno
-import getopt
 import time
 import shutil
 import sys
@@ -13,6 +12,7 @@ from os import listdir, sep as os_sep
 from os.path import isdir, isfile, join
 # local imports
 from . import consts
+from .args import Arguments, UpdateType
 from .github import Github
 from .globals import CRATES_VERSION, PULL_REQUESTS, SEARCH_INDEX, SEARCH_INDEX_BEFORE
 from .globals import SEARCH_INDEX_AFTER
@@ -21,23 +21,6 @@ from .utils import add_to_commit, clone_repo, exec_command_and_print_error, get_
 from .utils import checkout_target_branch, get_file_content, write_error, write_into_file
 from .utils import commit, commit_and_push, create_pull_request, push, revert_changes, write_msg
 from .utils import create_tag_and_push, get_last_commit_date, merging_branches, publish_crate
-
-
-class UpdateType:
-    MAJOR = 0
-    MEDIUM = 1
-    MINOR = 2
-
-    @staticmethod
-    def create_from_string(version_s):
-        version_s = version_s.lower()
-        if version_s == 'major':
-            return UpdateType.MAJOR
-        elif version_s == 'medium':
-            return UpdateType.MEDIUM
-        elif version_s == 'minor':
-            return UpdateType.MINOR
-        return None
 
 
 @contextmanager
@@ -478,236 +461,185 @@ def update_doc_content_repository(repositories, temp_dir, token, no_push):
                    'to be taken into account').format(consts.DOC_CONTENT_REPO))
 
 
-def start(update_type, token, no_push, doc_only, specified_crate, badges_only, tags_only):
+def start(args, temp_dir):
     # pylint: disable=too-many-branches,too-many-statements
-    write_msg('=> Creating temporary directory...')
-    with temporary_directory() as temp_dir:
-        write_msg('Temporary directory created in "{}"'.format(temp_dir))
-        write_msg('=> Cloning the repositories...')
-        repositories = []
-        for crate in consts.CRATE_LIST:
-            if specified_crate is not None and crate['crate'] != specified_crate:
-                continue
-            if crate["repository"] not in repositories:
-                repositories.append(crate["repository"])
-                if clone_repo(crate["repository"], temp_dir) is False:
-                    write_error('Cannot clone the "{}" repository...'.format(crate["repository"]))
-                    return
-        if len(repositories) < 1:
-            write_msg('No crate "{}" found. Aborting...'.format(specified_crate))
-            return
-        if doc_only is False:
-            if clone_repo(consts.BLOG_REPO, temp_dir, depth=1) is False:
-                write_error('Cannot clone the "{}" repository...'.format(consts.BLOG_REPO))
+    write_msg('Temporary directory created in "{}"'.format(temp_dir))
+    write_msg('=> Cloning the repositories...')
+    repositories = []
+    for crate in consts.CRATE_LIST:
+        if args.specified_crate is not None and crate['crate'] != args.specified_crate:
+            continue
+        if crate["repository"] not in repositories:
+            repositories.append(crate["repository"])
+            if clone_repo(crate["repository"], temp_dir) is False:
+                write_error('Cannot clone the "{}" repository...'.format(crate["repository"]))
                 return
-        if clone_repo(consts.DOC_REPO, temp_dir, depth=1) is False:
-            write_error('Cannot clone the "{}" repository...'.format(consts.DOC_REPO))
+    if len(repositories) < 1:
+        write_msg('No crate "{}" found. Aborting...'.format(args.specified_crate))
+        return
+    if args.doc_only is False:
+        if clone_repo(consts.BLOG_REPO, temp_dir, depth=1) is False:
+            write_error('Cannot clone the "{}" repository...'.format(consts.BLOG_REPO))
             return
+    if clone_repo(consts.DOC_REPO, temp_dir, depth=1) is False:
+        write_error('Cannot clone the "{}" repository...'.format(consts.DOC_REPO))
+        return
+    write_msg('Done!')
+
+    if args.doc_only is False:
+        write_msg('=> Updating [master] crates version...')
+        for crate in consts.CRATE_LIST:
+            if args.specified_crate is not None and crate['crate'] != args.specified_crate:
+                continue
+            if update_repo_version(crate["repository"], crate["crate"], crate["path"],
+                                   temp_dir, args.update_type,
+                                   args.badges_only or args.tags_only) is False:
+                write_error('The update for the "{}" crate failed...'.format(crate["crate"]))
+                return
         write_msg('Done!')
 
-        if doc_only is False:
-            write_msg('=> Updating [master] crates version...')
-            for crate in consts.CRATE_LIST:
-                if specified_crate is not None and crate['crate'] != specified_crate:
-                    continue
-                if update_repo_version(crate["repository"], crate["crate"], crate["path"],
-                                       temp_dir, update_type, badges_only or tags_only) is False:
-                    write_error('The update for the "{}" crate failed...'.format(crate["crate"]))
-                    return
-            write_msg('Done!')
-
-            if badges_only is False and tags_only is False:
-                write_msg('=> Committing{} to the "{}" branch...'
-                          .format(" and pushing" if no_push is False else "",
-                                  consts.MASTER_TMP_BRANCH))
-                for repo in repositories:
-                    commit(repo, temp_dir, "Update versions [ci skip]")
-                    if no_push is False:
-                        push(repo, temp_dir, consts.MASTER_TMP_BRANCH)
-                write_msg('Done!')
-
-                if no_push is False:
-                    write_msg('=> Creating PRs on master branch...')
-                    for repo in repositories:
-                        create_pull_request(repo, consts.MASTER_TMP_BRANCH, "master", token)
-                    write_msg('Done!')
-
-                write_msg('=> Building blog post...')
-                build_blog_post(repositories, temp_dir, token)
-                write_msg('Done!')
-
-        write_msg('=> Checking out "crate" branches')
-        for repo in repositories:
-            checkout_target_branch(repo, temp_dir, "crate")
-        write_msg('Done!')
-
-        if doc_only is False and badges_only is False and tags_only is False:
-            write_msg('=> Merging "master" branches into "crate" branches...')
-            for repo in repositories:
-                merging_branches(repo, temp_dir, "master")
-            write_msg('Done!')
-
-            write_msg('=> Updating [crate] crates version...')
-            for crate in consts.CRATE_LIST:
-                if specified_crate is not None and crate['crate'] != specified_crate:
-                    continue
-                if update_crate_version(crate["repository"], crate["crate"], crate["path"],
-                                        temp_dir, specified_crate) is False:
-                    write_error('The update for the "{}" crate failed...'.format(crate["crate"]))
-                    return
-            write_msg('Done!')
-
+        if args.badges_only is False and args.tags_only is False:
             write_msg('=> Committing{} to the "{}" branch...'
-                      .format(" and pushing" if no_push is False else "",
-                              consts.CRATE_TMP_BRANCH))
+                      .format(" and pushing" if args.no_push is False else "",
+                              consts.MASTER_TMP_BRANCH))
             for repo in repositories:
                 commit(repo, temp_dir, "Update versions [ci skip]")
-                if no_push is False:
-                    push(repo, temp_dir, consts.CRATE_TMP_BRANCH)
+                if args.no_push is False:
+                    push(repo, temp_dir, consts.MASTER_TMP_BRANCH)
             write_msg('Done!')
 
-            if no_push is False:
-                write_msg('=> Creating PRs on crate branch...')
+            if args.no_push is False:
+                write_msg('=> Creating PRs on master branch...')
                 for repo in repositories:
-                    create_pull_request(repo, consts.CRATE_TMP_BRANCH, "crate", token)
+                    create_pull_request(repo, consts.MASTER_TMP_BRANCH, "master", args.token)
                 write_msg('Done!')
 
-                write_msg('+++++++++++++++')
-                write_msg('++ IMPORTANT ++')
-                write_msg('+++++++++++++++')
-                write_msg('Almost everything has been done. Take a deep breath, check for opened '
-                          'pull requests and once done, we can move forward!')
-                write_msg("\n{}\n".format('\n'.join(PULL_REQUESTS)))
-                PULL_REQUESTS.append('=============')
-                input('Press ENTER to continue...')
-                write_msg('=> Publishing crates...')
-                for crate in consts.CRATE_LIST:
-                    if specified_crate is not None and crate['crate'] != specified_crate:
-                        continue
-                    publish_crate(crate["repository"], crate["path"], temp_dir, crate['crate'])
-                write_msg('Done!')
+            write_msg('=> Building blog post...')
+            build_blog_post(repositories, temp_dir, args.token)
+            write_msg('Done!')
 
-                write_msg('=> Creating PR for examples repository')
-                create_pull_request("examples", "pending", "master", token)
-                write_msg('Done!')
+    write_msg('=> Checking out "crate" branches')
+    for repo in repositories:
+        checkout_target_branch(repo, temp_dir, "crate")
+    write_msg('Done!')
 
-        if no_push is False and doc_only is False and badges_only is False:
-            write_msg("=> Generating tags and branches...")
+    if args.doc_only is False and args.badges_only is False and args.tags_only is False:
+        write_msg('=> Merging "master" branches into "crate" branches...')
+        for repo in repositories:
+            merging_branches(repo, temp_dir, "master")
+        write_msg('Done!')
+
+        write_msg('=> Updating [crate] crates version...')
+        for crate in consts.CRATE_LIST:
+            if args.specified_crate is not None and crate['crate'] != args.specified_crate:
+                continue
+            if update_crate_version(crate["repository"], crate["crate"], crate["path"],
+                                    temp_dir, args.specified_crate) is False:
+                write_error('The update for the "{}" crate failed...'.format(crate["crate"]))
+                return
+        write_msg('Done!')
+
+        write_msg('=> Committing{} to the "{}" branch...'
+                  .format(" and pushing" if args.no_push is False else "",
+                          consts.CRATE_TMP_BRANCH))
+        for repo in repositories:
+            commit(repo, temp_dir, "Update versions [ci skip]")
+            if args.no_push is False:
+                push(repo, temp_dir, consts.CRATE_TMP_BRANCH)
+        write_msg('Done!')
+
+        if args.no_push is False:
+            write_msg('=> Creating PRs on crate branch...')
             for repo in repositories:
-                generate_new_tag(repo, temp_dir, specified_crate)
-                generate_new_branches(repo, temp_dir, specified_crate)
+                create_pull_request(repo, consts.CRATE_TMP_BRANCH, "crate", args.token)
             write_msg('Done!')
 
-        if badges_only is False and tags_only is False:
-            input("About to regenerate documentation. Are you sure you want to continue? " +
-                  "(Press ENTER to continue)")
-            update_doc_content_repository(repositories, temp_dir, token, no_push)
-            write_msg('=> Preparing doc repo (too much dark magic in here urg)...')
-            cleanup_doc_repo(temp_dir)
-            write_msg('Done!')
-
-            write_msg('=> Building docs...')
+            write_msg('+++++++++++++++')
+            write_msg('++ IMPORTANT ++')
+            write_msg('+++++++++++++++')
+            write_msg('Almost everything has been done. Take a deep breath, check for opened '
+                      'pull requests and once done, we can move forward!')
+            write_msg("\n{}\n".format('\n'.join(PULL_REQUESTS)))
+            PULL_REQUESTS.append('=============')
+            input('Press ENTER to continue...')
+            write_msg('=> Publishing crates...')
             for crate in consts.CRATE_LIST:
-                if crate['crate'] == 'gtk-test':
+                if args.specified_crate is not None and crate['crate'] != args.specified_crate:
                     continue
-                write_msg('-> Building docs for {}...'.format(crate['crate']))
-                build_docs(crate['repository'], temp_dir, crate['path'],
-                           crate.get('doc_name', crate['crate']))
-            end_docs_build(temp_dir)
+                publish_crate(crate["repository"], crate["path"], temp_dir, crate['crate'])
             write_msg('Done!')
 
-            write_msg('=> Committing{} docs to the "{}" branch...'
-                      .format(" and pushing" if no_push is False else "",
-                              consts.CRATE_TMP_BRANCH))
-            commit(consts.DOC_REPO, temp_dir, "Regen docs")
-            if no_push is False:
-                push(consts.DOC_REPO, temp_dir, consts.CRATE_TMP_BRANCH)
-                create_pull_request(consts.DOC_REPO, consts.CRATE_TMP_BRANCH, "gh-pages", token)
-                write_msg("New pull request(s):\n\n{}\n".format('\n'.join(PULL_REQUESTS)))
+            write_msg('=> Creating PR for examples repository')
+            create_pull_request("examples", "pending", "master", args.token)
             write_msg('Done!')
 
-        if doc_only is False and tags_only is False:
-            write_msg('=> Updating blog...')
-            if update_badges(consts.BLOG_REPO, temp_dir, specified_crate) is False:
-                write_error("Error when trying to update badges...")
-            elif no_push is False:
-                commit_and_push(consts.BLOG_REPO, temp_dir, "Update versions",
-                                consts.MASTER_TMP_BRANCH)
-                create_pull_request(consts.BLOG_REPO, consts.MASTER_TMP_BRANCH, "master", token)
-            write_msg('Done!')
+    if args.no_push is False and args.doc_only is False and args.badges_only is False:
+        write_msg("=> Generating tags and branches...")
+        for repo in repositories:
+            generate_new_tag(repo, temp_dir, args.specified_crate)
+            generate_new_branches(repo, temp_dir, args.specified_crate)
+        write_msg('Done!')
 
-        write_msg('Seems like most things are done! Now remains:')
-        write_msg(" * Check generated docs for all crates (don't forget to enable features!).")
-        input('Press ENTER to leave (once done, the temporary directory "{}" will be destroyed)'
-              .format(temp_dir))
+    if args.badges_only is False and args.tags_only is False:
+        input("About to regenerate documentation. Are you sure you want to continue? " +
+              "(Press ENTER to continue)")
+        update_doc_content_repository(repositories, temp_dir, args.token, args.no_push)
+        write_msg('=> Preparing doc repo (too much dark magic in here urg)...')
+        cleanup_doc_repo(temp_dir)
+        write_msg('Done!')
 
+        write_msg('=> Building docs...')
+        for crate in consts.CRATE_LIST:
+            if crate['crate'] == 'gtk-test':
+                continue
+            write_msg('-> Building docs for {}...'.format(crate['crate']))
+            build_docs(crate['repository'], temp_dir, crate['path'],
+                       crate.get('doc_name', crate['crate']))
+        end_docs_build(temp_dir)
+        write_msg('Done!')
 
-def write_help():
-    write_msg("release.py accepts the following options:")
-    write_msg("")
-    write_msg(" * -h | --help                  : display this message")
-    write_msg(" * -t <token> | --token=<token> : give the github token")
-    write_msg(" * -m <mode> | --mode=<mode>    : give the update type (MINOR|MEDIUM|MAJOR)")
-    write_msg(" * --no-push                    : performs all operations but doesn't push anything")
-    write_msg(" * --doc-only                   : only builds documentation")
-    write_msg(" * -c <crate> | --crate=<crate> : only update the given crate (for test purpose"
-              " mainly)")
-    write_msg(" * --badges-only                : only update the badges on the website")
-    write_msg(" * --tags-only                  : only create new tags")
+        write_msg('=> Committing{} docs to the "{}" branch...'
+                  .format(" and pushing" if args.no_push is False else "",
+                          consts.CRATE_TMP_BRANCH))
+        commit(consts.DOC_REPO, temp_dir, "Regen docs")
+        if args.no_push is False:
+            push(consts.DOC_REPO, temp_dir, consts.CRATE_TMP_BRANCH)
+            create_pull_request(
+                consts.DOC_REPO,
+                consts.CRATE_TMP_BRANCH,
+                "gh-pages",
+                args.token)
+            write_msg("New pull request(s):\n\n{}\n".format('\n'.join(PULL_REQUESTS)))
+        write_msg('Done!')
+
+    if args.doc_only is False and args.tags_only is False:
+        write_msg('=> Updating blog...')
+        if update_badges(consts.BLOG_REPO, temp_dir, args.specified_crate) is False:
+            write_error("Error when trying to update badges...")
+        elif args.no_push is False:
+            commit_and_push(consts.BLOG_REPO, temp_dir, "Update versions",
+                            consts.MASTER_TMP_BRANCH)
+            create_pull_request(
+                consts.BLOG_REPO,
+                consts.MASTER_TMP_BRANCH,
+                "master",
+                args.token)
+        write_msg('Done!')
+
+    write_msg('Seems like most things are done! Now remains:')
+    write_msg(" * Check generated docs for all crates (don't forget to enable features!).")
+    input('Press ENTER to leave (once done, the temporary directory "{}" will be destroyed)'
+          .format(temp_dir))
 
 
 def main(argv):
-    # pylint: disable=too-many-branches
-    try:
-        opts = getopt.getopt(argv,
-                             "ht:m:c:",
-                             ["help", "token=", "mode=", "no-push", "doc-only", "crate",
-                              "badges-only", "tags-only"])[0] # second argument is "args"
-    except getopt.GetoptError:
-        write_help()
-        sys.exit(2)
-
-    token = None
-    mode = None
-    no_push = False
-    doc_only = False
-    specified_crate = None
-    badges_only = False
-    tags_only = False
-
-    for opt, arg in opts:
-        if opt in ('-h', '--help'):
-            write_help()
-            sys.exit(0)
-        elif opt in ("-t", "--token"):
-            token = arg
-        elif opt in ("-m", "--mode"):
-            mode = UpdateType.create_from_string(arg)
-            if mode is None:
-                write_error('{}: Invalid update type received. Accepted values: '
-                            '(MINOR|MEDIUM|MAJOR)'.format(opt))
-                sys.exit(3)
-        elif opt == "--no-push":
-            no_push = True
-        elif opt == "--doc-only":
-            doc_only = True
-        elif opt == "--badges-only":
-            badges_only = True
-        elif opt in ('-c', '--crate'):
-            specified_crate = arg
-        elif opt == '--tags-only':
-            tags_only = True
-        else:
-            write_msg('"{}": unknown option'.format(opt))
-            write_msg('Use "-h" or "--help" to see help')
-            sys.exit(0)
-    if token is None and no_push is False:
-        write_error('Missing token argument.')
-        sys.exit(4)
-    if mode is None and doc_only is False and badges_only is False and tags_only is False:
-        write_error('Missing update type argument.')
-        sys.exit(5)
-    start(mode, token, no_push, doc_only, specified_crate, badges_only, tags_only)
+    args = Arguments.parse_arguments(argv)
+    if args is None:
+        sys.exit(1)
+    write_msg('=> Creating temporary directory...')
+    with temporary_directory() as temp_dir:
+        write_msg('Done!')
+        start(args, temp_dir)
 
 
 # Beginning of the script
