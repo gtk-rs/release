@@ -3,29 +3,24 @@
 from contextlib import contextmanager
 # pip3 install datetime
 import datetime
-from github import Github
-from os import listdir, sep as os_sep
-from os.path import isdir, isfile, join
-from my_toml import TomlHandler
-from utils import clone_repo, compare_versions, exec_command, exec_command_and_print_error
-from utils import get_features, get_file_content, post_content, write_error, write_into_file
-from utils import add_to_commit, commit, commit_and_push, push, revert_changes, write_msg
-from utils import checkout_target_branch, get_last_commit_date, merging_branches, publish_crate
-from utils import create_tag_and_push
-import consts
 import errno
 import getopt
 import time
 import shutil
 import sys
 import tempfile
-
-
-CRATES_VERSION = {}
-PULL_REQUESTS = []
-SEARCH_INDEX = []
-SEARCH_INDEX_BEFORE = []
-SEARCH_INDEX_AFTER = []
+from os import listdir, sep as os_sep
+from os.path import isdir, isfile, join
+# local imports
+import consts
+from .github import Github
+from .globals import CRATES_VERSION, PULL_REQUESTS, SEARCH_INDEX, SEARCH_INDEX_BEFORE
+from .globals import SEARCH_INDEX_AFTER
+from .my_toml import TomlHandler
+from .utils import add_to_commit, clone_repo, exec_command_and_print_error, get_features
+from .utils import checkout_target_branch, get_file_content, write_error, write_into_file
+from .utils import commit, commit_and_push, create_pull_request, push, revert_changes, write_msg
+from .utils import create_tag_and_push, get_last_commit_date, merging_branches, publish_crate
 
 
 class UpdateType:
@@ -33,59 +28,33 @@ class UpdateType:
     MEDIUM = 1
     MINOR = 2
 
-    def create_from_string(s):
-        s = s.lower()
-        if s == 'major':
+    @staticmethod
+    def create_from_string(version_s):
+        version_s = version_s.lower()
+        if version_s == 'major':
             return UpdateType.MAJOR
-        elif s == 'medium':
+        elif version_s == 'medium':
             return UpdateType.MEDIUM
-        elif s == 'minor':
+        elif version_s == 'minor':
             return UpdateType.MINOR
         return None
 
 
 @contextmanager
-def TemporaryDirectory():
+def temporary_directory():
     name = tempfile.mkdtemp()
     try:
         yield name
     finally:
         try:
             shutil.rmtree(name)
-        except OSError as e:
+        except OSError as err:
             # if the directory has already been removed, no need to raise an error
-            if e.errno != errno.ENOENT:
+            if err.errno != errno.ENOENT:
                 raise
 
 
-def create_pull_request(repo_name, from_branch, target_branch, token, add_to_list=True):
-    r = post_content('{}/repos/{}/{}/pulls'.format(consts.GH_API_URL, consts.ORGANIZATION,
-                                                   repo_name),
-                     token,
-                     {'title': '[release] merging {} into {}'.format(from_branch, target_branch),
-                      'body': 'cc @GuillaumeGomez @EPashkin @sdroege',
-                      'base': target_branch,
-                      'head': from_branch,
-                      'maintainer_can_modify': True})
-    if r is None:
-        write_error("Pull request from {repo}/{from_b} to {repo}/{target} couldn't be created. You "
-                    "need to do it yourself... (url provided at the end)"
-                    .format(repo=repo_name,
-                            from_b=from_branch,
-                            target=target_branch))
-        input("Press ENTER once done to continue...")
-        PULL_REQUESTS.append('|=> "{}/{}/{}/compare/{}...{}?expand=1"'
-                             .format(consts.GITHUB_URL,
-                                     consts.ORGANIZATION,
-                                     repo_name,
-                                     target_branch,
-                                     from_branch))
-    else:
-        write_msg("===> Pull request created: {}".format(r['html_url']))
-        if add_to_list is True:
-            PULL_REQUESTS.append('> {}'.format(r['html_url']))
-
-
+# Doesn't handle version number containing something else than numbers and '.'!
 def update_version(version, update_type, section_name, place_type="section"):
     version_split = version.replace('"', '').split('.')
     if len(version_split) != 3:
@@ -98,15 +67,7 @@ def update_version(version, update_type, section_name, place_type="section"):
         version_split[update_type] = str(int(version_split[update_type]) + 1)
         version_split[UpdateType.MINOR] = '0'
     else:
-        i = 0
-        for c in version_split[update_type]:
-            if c >= '0' and c <= '9':
-                break
-            i += 1
-            if i >= len(c):
-                return None
-        s = version_split[update_type][i:]
-        version_split[update_type] = '{}{}'.format(version_split[update_type][:i], str(int(s) + 1))
+        version_split[update_type] = str(int(version_split[update_type]) + 1)
         version_split[UpdateType.MEDIUM] = '0'
         version_split[UpdateType.MINOR] = '0'
     return '"{}"'.format('.'.join(version_split))
@@ -177,8 +138,8 @@ def update_crate_version(repo_name, crate_name, crate_dir_path, temp_dir, specif
     return result
 
 
-def update_repo_version(repo_name, crate_name, crate_dir_path, temp_dir, update_type,
-                        no_update):
+def update_repo_version(repo_name, crate_name, crate_dir_path, temp_dir, update_type, no_update):
+    # pylint: disable=too-many-branches,too-many-locals
     file_path = join(join(join(temp_dir, repo_name), crate_dir_path), "Cargo.toml")
     output = file_path.replace(temp_dir, "")
     if output.startswith('/'):
@@ -219,9 +180,10 @@ def update_repo_version(repo_name, crate_name, crate_dir_path, temp_dir, update_
                                                            entry,
                                                            [])
                     section.set(entry, new_version)
-    for up in versions_update:
-        write_msg('\t{}: {} => {}'.format(up['dependency_name'], up['old_version'],
-                                          up['new_version']))
+    for update in versions_update:
+        write_msg('\t{}: {} => {}'.format(update['dependency_name'],
+                                          update['old_version'],
+                                          update['new_version']))
     out = str(toml)
     if not out.endswith("\n"):
         out += '\n'
@@ -264,6 +226,7 @@ def cleanup_doc_repo(temp_dir):
 
 
 def build_docs(repo_name, temp_dir, extra_path, crate_name):
+    # pylint: disable=too-many-locals
     path = join(join(temp_dir, repo_name), extra_path)
     features = get_features(join(path, 'Cargo.toml'))
     # We can't add "--no-deps" argument to cargo doc, otherwise we lose links to items of
@@ -280,8 +243,8 @@ def build_docs(repo_name, temp_dir, extra_path, crate_name):
     try:
         file_list = ' '.join(['"{}"'.format(f) for f in listdir(doc_folder)
                               if isfile(join(doc_folder, f))])
-    except Exception as e:
-        write_error('Error occured in build docs: {}'.format(e))
+    except Exception as err:
+        write_error('Error occured in build docs: {}'.format(err))
         input("It seems like the \"{}\" folder doesn't exist. Try to fix it then press ENTER..."
               .format(doc_folder))
     # Copy documentation files
@@ -330,17 +293,17 @@ def end_docs_build(temp_dir):
     revert_changes(consts.DOC_REPO, temp_dir,
                    ['COPYRIGHT.txt', 'LICENSE-APACHE.txt', 'LICENSE-MIT.txt'])
     try:
-        with open(join(path, 'search-index.js'), 'w') as f:
-            f.write('\n'.join(SEARCH_INDEX_BEFORE))
-            f.write('\n'.join(SEARCH_INDEX))
-            f.write('\n'.join(SEARCH_INDEX_AFTER))
+        with open(join(path, 'search-index.js'), 'w') as file:
+            file.write('\n'.join(SEARCH_INDEX_BEFORE))
+            file.write('\n'.join(SEARCH_INDEX))
+            file.write('\n'.join(SEARCH_INDEX_AFTER))
         command = ['bash', '-c',
                    'cd minifier && cargo run --release -- "{}"'.format(path)]
         if not exec_command_and_print_error(command):
             input("Couldn't run minifier! Try to fix it and then press ENTER to continue...")
         add_to_commit(consts.DOC_REPO, temp_dir, ['.'])
-    except Exception as e:
-        write_error('An exception occured in "end_docs_build": {}'.format(e))
+    except Exception as err:
+        write_error('An exception occured in "end_docs_build": {}'.format(err))
         input("Press ENTER to continue...")
     input('If you want to prevent "{}" to be updated, now is the good time! Press ENTER to '
           'continue...'.format(join(path, "main.js")))
@@ -348,21 +311,21 @@ def end_docs_build(temp_dir):
 
 def write_merged_prs(merged_prs, contributors, repo_url):
     content = ''
-    for pr in reversed(merged_prs):
-        if pr.title.startswith('[release] '):
+    for merged_pr in reversed(merged_prs):
+        if merged_pr.title.startswith('[release] '):
             continue
-        if pr.author not in contributors:
-            contributors.append(pr.author)
-        content += ' * [{}]({}/pull/{})\n'.format(pr.title.replace('<', '&lt;')
-                                                          .replace('>', '&gt;')
-                                                          .replace('[', '\\[')
-                                                          .replace(']', '\\]'),
-                                                  repo_url,
-                                                  pr.number)
+        if merged_pr.author not in contributors:
+            contributors.append(merged_pr.author)
+        md_content = (merged_pr.title.replace('<', '&lt;')
+                      .replace('>', '&gt;')
+                      .replace('[', '\\[')
+                      .replace(']', '\\]'))
+        content += ' * [{}]({}/pull/{})\n'.format(md_content, repo_url, merged_pr.number)
     return content + '\n'
 
 
 def build_blog_post(repositories, temp_dir, token):
+    # pylint: disable=too-many-locals
     content = '''---
 layout: post
 author: {}
@@ -424,8 +387,8 @@ For the interested ones, here is the list of the merged pull requests:
             write_msg('New blog post written into "{}".'.format(file_name))
         add_to_commit(consts.BLOG_REPO, temp_dir, [file_name])
         commit(consts.BLOG_REPO, temp_dir, "Add new blog post")
-    except Exception as e:
-        write_error('build_blog_post failed: {}'.format(e))
+    except Exception as err:
+        write_error('build_blog_post failed: {}'.format(err))
         write_msg('\n=> Here is the blog post content:\n{}\n<='.format(content))
 
 
@@ -516,8 +479,9 @@ def update_doc_content_repository(repositories, temp_dir, token, no_push):
 
 
 def start(update_type, token, no_push, doc_only, specified_crate, badges_only, tags_only):
+    # pylint: disable=too-many-branches,too-many-statements
     write_msg('=> Creating temporary directory...')
-    with TemporaryDirectory() as temp_dir:
+    with temporary_directory() as temp_dir:
         write_msg('Temporary directory created in "{}"'.format(temp_dir))
         write_msg('=> Cloning the repositories...')
         repositories = []
@@ -693,11 +657,12 @@ def write_help():
 
 
 def main(argv):
+    # pylint: disable=too-many-branches
     try:
-        opts, args = getopt.getopt(argv,
-                                   "ht:m:c:",
-                                   ["help", "token=", "mode=", "no-push", "doc-only", "crate",
-                                    "badges-only", "tags-only"])
+        opts = getopt.getopt(argv,
+                             "ht:m:c:",
+                             ["help", "token=", "mode=", "no-push", "doc-only", "crate",
+                              "badges-only", "tags-only"])[0] # second argument is "args"
     except getopt.GetoptError:
         write_help()
         sys.exit(2)
@@ -722,15 +687,15 @@ def main(argv):
                 write_error('{}: Invalid update type received. Accepted values: '
                             '(MINOR|MEDIUM|MAJOR)'.format(opt))
                 sys.exit(3)
-        elif opt in ("--no-push"):
+        elif opt == "--no-push":
             no_push = True
-        elif opt in ("--doc-only"):
+        elif opt == "--doc-only":
             doc_only = True
-        elif opt in ("--badges-only"):
+        elif opt == "--badges-only":
             badges_only = True
         elif opt in ('-c', '--crate'):
             specified_crate = arg
-        elif opt in ('--tags-only'):
+        elif opt == '--tags-only':
             tags_only = True
         else:
             write_msg('"{}": unknown option'.format(opt))

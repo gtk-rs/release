@@ -7,4 +7,3 @@ __author__ = 'Guillaume Gomez'
 
 
 __all__ = ['consts', 'github', 'my_toml', 'release', 'utils']
-

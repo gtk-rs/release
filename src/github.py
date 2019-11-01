@@ -2,7 +2,7 @@ from datetime import date
 # pip3 install requests
 import requests
 
-def compare_dates(gh_date, d):
+def compare_dates(gh_date, comp_date):
     if gh_date is None or len(gh_date) < 1:
         return False
     gh_date = gh_date.split('T')[0].split('-')
@@ -10,7 +10,7 @@ def compare_dates(gh_date, d):
     month = int(gh_date[1])
     day = int(gh_date[2])
 
-    return date(year, month, day) >= d
+    return date(year, month, day) >= comp_date
 
 
 def get_page_number(url):
@@ -19,7 +19,7 @@ def get_page_number(url):
         if part.startswith('page='):
             try:
                 return int(part.split('=')[-1])
-            except:
+            except Exception:
                 break
     return 1
 
@@ -45,17 +45,16 @@ def filter_data(content, to_return, max_date):
     total = 0
     if content.__class__.__name__ == 'dict':
         return 0
-    for pr in content:
-        if 'closed_at' in pr and pr['closed_at'] is not None:
-            if compare_dates(pr['closed_at'], max_date):
-                to_return.append(pr)
+    for pull_request in content:
+        if 'closed_at' in pull_request and pull_request['closed_at'] is not None:
+            if compare_dates(pull_request['closed_at'], max_date):
+                to_return.append(pull_request)
                 total += 1
-        elif 'updated_at' in pr:
-            if compare_dates(pr['updated_at'], max_date):
-                to_return.append(pr)
+        elif 'updated_at' in pull_request:
+            if compare_dates(pull_request['updated_at'], max_date):
+                to_return.append(pull_request)
                 total += 1
     return total
-
 
 
 def get_url_data(url, headers, params):
@@ -80,7 +79,10 @@ def get_url_data(url, headers, params):
 
 # This function tries to get as much github data as possible by running
 # "parallel" requests.
-def get_all_contents(url, state=None, max_date=None, token=None, recursive=True, params={}):
+def get_all_contents(url, state=None, max_date=None, token=None, recursive=True, params=None):
+    # pylint: disable=too-many-branches,too-many-locals
+    if params is None:
+        params = {}
     headers = {
         'User-Agent': 'GuillaumeGomez',
         'Accept': 'application/vnd.github.v3+json',
@@ -100,17 +102,17 @@ def get_all_contents(url, state=None, max_date=None, token=None, recursive=True,
         if filter_data(content, to_return, max_date) < 100:
             return to_return
     else:
-        for x in content:
-            to_return.append(x)
+        for line in content:
+            to_return.append(line)
     if 'Link' not in res.headers or not recursive:
         # If there are no other pages, we can return the current content.
         return to_return
 
-    h = res.headers['Link']
-    if h is None or len(h) < 1:
+    header_link = res.headers.get('Link')
+    if header_link is None or len(header_link) < 1:
         return content
 
-    next_page_url, last_page_url = get_next_pages_url(h)
+    next_page_url, last_page_url = get_next_pages_url(header_link)
     if len(last_page_url) < 10 or len(next_page_url) < 10:
         return to_return
     next_page = get_page_number(next_page_url)
@@ -129,8 +131,8 @@ def get_all_contents(url, state=None, max_date=None, token=None, recursive=True,
             if filter_data(content, to_return, max_date) < 100:
                 break
         else:
-            for x in content:
-                to_return.append(x)
+            for line in content:
+                to_return.append(line)
         next_page += 1
     return to_return
 
@@ -180,30 +182,18 @@ class Repository:
                                token=self.gh_obj.token)
         if prs is None:
             return []
-        return [PullRequest(self.gh_obj, self.name, self.owner,
-                            pr['number'],
-                            pr['base']['ref'], pr['head']['ref'],
-                            pr['head']['sha'], pr['title'],
-                            pr['user']['login'], pr['state'],
-                            pr['merged_at'], pr['closed_at']) for pr in prs
-                            if (only_merged is False or
-                                (pr['merged_at'] is not None and
-                                 len(pr['merged_at']) > 0))]
+        return [self.create_pr_obj(pull_request) for pull_request in prs
+                if (only_merged is False or (pull_request['merged_at'] is not None and
+                                             len(pull_request['merged_at']) > 0))]
 
     def get_pull(self, pull_number):
-        pr = get_all_contents('https://api.github.com/repos/{}/{}/pulls/{}'.format(self.owner,
-                                                                                   self.name,
-                                                                                   pull_number),
-                              'all', None,
-                              token=self.gh_obj.token)
-        if pr is None:
-            return None
-        return PullRequest(self.gh_obj, self.name, self.owner,
-                           pull_number,
-                           pr['base']['ref'], pr['head']['ref'],
-                           pr['head']['sha'], pr['title'],
-                           pr['user']['login'], pr['state'],
-                           pr['merged_at'], pr['closed_at'])
+        pull_request = get_all_contents(
+            'https://api.github.com/repos/{}/{}/pulls/{}'.format(
+                self.owner, self.name, pull_number),
+            'all', None,
+            token=self.gh_obj.token,
+        )
+        return self.create_pr_obj(pull_request, pull_number)
 
     def get_commits(self, branch, since, until):
         commits = get_all_contents(
@@ -219,6 +209,25 @@ class Repository:
         return [Commit(x['commit']['author']['name'], x['commit']['committer']['name'],
                        x['sha'], x['commit']['message'])
                 for x in commits]
+
+    def create_pr_obj(self, pull_request, pull_number=None):
+        if pull_request is None:
+            return None
+        if pull_number is None:
+            pull_number = pull_request['number']
+        return PullRequest(
+            self.gh_obj,
+            self.name,
+            self.owner,
+            pull_number,
+            pull_request['base']['ref'],
+            pull_request['head']['ref'],
+            pull_request['head']['sha'],
+            pull_request['title'],
+            pull_request['user']['login'],
+            pull_request['state'],
+            pull_request['merged_at'],
+            pull_request['closed_at'])
 
 
 class Commit:
