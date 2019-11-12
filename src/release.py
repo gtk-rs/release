@@ -378,12 +378,13 @@ For the interested ones, here is the list of the merged pull requests:
     write_msg('Done!')
 
 
-def generate_new_tag(repository, temp_dir, specified_crate):
+def generate_new_tag(repository, temp_dir, specified_crate, args):
     # We make a new tag for every crate:
     #
     # * If it is a "sys" crate, then we add its name to the tag
     # * If not, then we just keep its version number
-    for crate in consts.CRATE_LIST:
+    for crate in args.crates:
+        crate = crate['crate']
         if crate['repository'] == repository:
             if specified_crate is not None and crate['crate'] != specified_crate:
                 continue
@@ -395,12 +396,13 @@ def generate_new_tag(repository, temp_dir, specified_crate):
             create_tag_and_push(tag_name, repository, temp_dir)
 
 
-def generate_new_branches(repository, temp_dir, specified_crate):
+def generate_new_branches(repository, temp_dir, specified_crate, args):
     # We make a new branch for every crate based on the current "crate" branch:
     #
     # * If it is a "sys" crate, then we ignore it.
     # * If not, then we create a new branch
-    for crate in consts.CRATE_LIST:
+    for crate in args.crates:
+        crate = crate['crate']
         if crate['repository'] == repository:
             if specified_crate is not None and crate['crate'] != specified_crate:
                 continue
@@ -412,7 +414,7 @@ def generate_new_branches(repository, temp_dir, specified_crate):
             push(repository, temp_dir, branch_name)
 
 
-def update_doc_content_repository(repositories, temp_dir, token, no_push):
+def update_doc_content_repository(repositories, temp_dir, token, no_push, args):
     if clone_repo(consts.DOC_CONTENT_REPO, temp_dir) is False:
         input('Try to fix the problem then press ENTER to continue...')
     write_msg("Done!")
@@ -420,7 +422,8 @@ def update_doc_content_repository(repositories, temp_dir, token, no_push):
     write_msg("=> Generating documentation for crates...")
     for repo in repositories:
         current = None
-        for crate in consts.CRATE_LIST:
+        for crate in args.crates:
+            crate = crate['crate']
             if crate['repository'] == repo:
                 current = crate
                 break
@@ -467,7 +470,8 @@ def update_doc_content_repository(repositories, temp_dir, token, no_push):
 def clone_repositories(args, temp_dir):
     write_msg('=> Cloning the repositories...')
     repositories = []
-    for crate in consts.CRATE_LIST:
+    for crate in args.crates:
+        crate = crate['crate']
         if args.specified_crate is not None and crate['crate'] != args.specified_crate:
             continue
         if crate["repository"] not in repositories:
@@ -491,11 +495,13 @@ def clone_repositories(args, temp_dir):
 
 def update_crates_versions(args, temp_dir, repositories):
     write_msg('=> Updating [master] crates version...')
-    for crate in consts.CRATE_LIST:
+    for crate in args.crates:
+        update_type = crate['up-type']
+        crate = crate['crate']
         if args.specified_crate is not None and crate['crate'] != args.specified_crate:
             continue
         if update_repo_version(crate["repository"], crate["crate"], crate["path"],
-                               temp_dir, args.update_type,
+                               temp_dir, update_type,
                                args.badges_only or args.tags_only) is False:
             write_error('The update for the "{}" crate failed...'.format(crate["crate"]))
             return False
@@ -525,7 +531,8 @@ def update_crate_repositories_branches(args, temp_dir, repositories):
     write_msg('Done!')
 
     write_msg('=> Updating [crate] crates version...')
-    for crate in consts.CRATE_LIST:
+    for crate in args.crates:
+        crate = crate['crate']
         if args.specified_crate is not None and crate['crate'] != args.specified_crate:
             continue
         if update_crate_version(crate["repository"], crate["crate"], crate["path"],
@@ -560,7 +567,8 @@ def publish_crates(args, temp_dir):
     PULL_REQUESTS.append('=============')
     input('Press ENTER to continue...')
     write_msg('=> Publishing crates...')
-    for crate in consts.CRATE_LIST:
+    for crate in args.crates:
+        crate = crate['crate']
         if args.specified_crate is not None and crate['crate'] != args.specified_crate:
             continue
         publish_crate(crate["repository"], crate["path"], temp_dir, crate['crate'])
@@ -578,8 +586,8 @@ def generate_tags_and_version_branches(args, temp_dir, repositories):
         return
     write_msg("=> Generating tags and branches...")
     for repo in repositories:
-        generate_new_tag(repo, temp_dir, args.specified_crate)
-        generate_new_branches(repo, temp_dir, args.specified_crate)
+        generate_new_tag(repo, temp_dir, args.specified_crate, args)
+        generate_new_branches(repo, temp_dir, args.specified_crate, args)
     write_msg('Done!')
 
 
@@ -588,13 +596,14 @@ def regenerate_documentation(args, temp_dir, repositories):
         return
     input("About to regenerate documentation. Are you sure you want to continue? " +
           "(Press ENTER to continue)")
-    update_doc_content_repository(repositories, temp_dir, args.token, args.no_push)
+    update_doc_content_repository(repositories, temp_dir, args.token, args.no_push, args)
     write_msg('=> Preparing doc repo (too much dark magic in here urg)...')
     cleanup_doc_repo(temp_dir)
     write_msg('Done!')
 
     write_msg('=> Building docs...')
-    for crate in consts.CRATE_LIST:
+    for crate in args.crates:
+        crate = crate['crate']
         if crate['crate'] == 'gtk-test':
             continue
         write_msg('-> Building docs for {}...'.format(crate['crate']))

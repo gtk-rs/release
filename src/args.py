@@ -1,5 +1,6 @@
 import getopt
 from .utils import write_error, write_msg
+from . import consts
 
 
 class UpdateType:
@@ -19,6 +20,31 @@ class UpdateType:
         return None
 
 
+def get_answer(text):
+    while True:
+        text = input('{} [Y/n] '.format(text)).strip().lower()
+        if len(text) == 0 or text == 'y':
+            return True
+        if text == 'n':
+            return False
+        write_msg('-> Invalid answer "{}": only "Y" and "n" are expected'.format(text))
+
+
+def get_up_type(crate, mode, pick_update_type_for_crates):
+    if mode is None and pick_update_type_for_crates is False:
+        return None
+    while pick_update_type_for_crates is True:
+        text = input('Which kind of update do you want for "{}"? [MINOR/MEDIUM/MAJOR] '
+                     .format(crate))
+        text = text.strip().lower()
+        mode = UpdateType.create_from_string(text)
+        if mode is not None:
+            break
+        write_msg('Invalid update type received: "{}". Accepted values: (MINOR|MEDIUM|MAJOR)'
+                  .format(text))
+    return mode
+
+
 def write_help():
     write_msg("release.py accepts the following options:")
     write_msg("")
@@ -31,6 +57,8 @@ def write_help():
               " mainly)")
     write_msg(" * --badges-only                : only update the badges on the website")
     write_msg(" * --tags-only                  : only create new tags")
+    write_msg(" * --pick-crates                : add an interactive way to pick crates")
+    write_msg(" * --pick-update-type-for-crates: pick an update type for each crate")
 
 
 class Arguments:
@@ -42,6 +70,7 @@ class Arguments:
         self.specified_crate = None
         self.badges_only = False
         self.tags_only = False
+        self.crates = consts.CRATE_LIST
 
     @staticmethod
     def parse_arguments(argv):
@@ -56,6 +85,8 @@ class Arguments:
             return None
 
         instance = Arguments()
+
+        pick_update_type_for_crates = False
 
         for opt, arg in opts:
             if opt in ('-h', '--help'):
@@ -79,6 +110,10 @@ class Arguments:
                 instance.specified_crate = arg
             elif opt == '--tags-only':
                 instance.tags_only = True
+            elif opt == '--pick-crates':
+                instance.crates = []
+            elif opt == '--pick-update-type-for-crates':
+                pick_update_type_for_crates = True
             else:
                 write_msg('"{}": unknown option'.format(opt))
                 write_msg('Use "-h" or "--help" to see help')
@@ -89,7 +124,24 @@ class Arguments:
         if (instance.mode is None and
                 instance.doc_only is False and
                 instance.badges_only is False and
-                instance.tags_only is False):
+                instance.tags_only is False and
+                pick_update_type_for_crates is False):
             write_error('Missing update type argument.')
             return None
+        if len(instance.crates) == 0:
+            for crate in consts.CRATE_LIST:
+                if get_answer('Do you want to include "{}" in this release?') is True:
+                    instance.crates.append(
+                        {
+                            'up-type': get_up_type(crate,
+                                                   instance.mode,
+                                                   pick_update_type_for_crates),
+                            'crate': crate,
+                        })
+        else:
+            instance.crates = [
+                {
+                    'up-type': get_up_type(crate, instance.mode, pick_update_type_for_crates),
+                    'crate': crate,
+                } for crate in instance.crates]
         return instance
