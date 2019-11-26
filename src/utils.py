@@ -6,9 +6,9 @@ import time
 # pip3 install requests
 import requests
 # local import
-from . import consts
-from .globals import PULL_REQUESTS
-from .my_toml import TomlHandler
+import consts
+from globals import PULL_REQUESTS
+from my_toml import TomlHandler
 
 
 def write_error(error_msg):
@@ -331,7 +331,7 @@ def create_pull_request(repo_name, from_branch, target_branch, token, add_to_lis
 def check_rustdoc_is_nightly():
     write_msg("=> Checking if default rustdoc is the nightly one...")
     ret, stdout, stderr = exec_command(['bash', '-c', 'rustdoc --version'])
-    if ret != 0:
+    if ret is False:
         write_msg("Failed to run `rustdoc --version`...\n{}".format(stderr))
         return False
     parts = stdout.split(' ')

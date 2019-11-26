@@ -1,6 +1,7 @@
 import getopt
-from .utils import write_error, write_msg
-from . import consts
+# local imports
+from utils import write_error, write_msg
+import consts
 
 
 class UpdateType:
