@@ -11,7 +11,6 @@ import tempfile
 from os import listdir, sep as os_sep
 from os.path import isdir, isfile, join
 # local imports
-from . import consts
 from .args import Arguments, UpdateType
 from .github import Github
 from .globals import CRATES_VERSION, PULL_REQUESTS, SEARCH_INDEX, SEARCH_INDEX_BEFORE
@@ -21,6 +20,7 @@ from .utils import add_to_commit, clone_repo, exec_command_and_print_error, get_
 from .utils import checkout_target_branch, get_file_content, write_error, write_into_file
 from .utils import commit, commit_and_push, create_pull_request, push, revert_changes, write_msg
 from .utils import create_tag_and_push, get_last_commit_date, merging_branches, publish_crate
+from . import consts
 
 
 @contextmanager
@@ -686,6 +686,9 @@ def main(argv):
     args = Arguments.parse_arguments(argv)
     if args is None:
         sys.exit(1)
+    if check_rustdoc_is_nightly() is False:
+        return
+    input('you can leave')
     write_msg('=> Creating temporary directory...')
     with temporary_directory() as temp_dir:
         write_msg('Temporary directory created in "{}"'.format(temp_dir))
