@@ -8,7 +8,6 @@ import time
 import shutil
 import sys
 import tempfile
-import os
 from os import listdir, sep as os_sep
 from os.path import isdir, isfile, join
 
