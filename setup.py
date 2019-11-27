@@ -15,7 +15,6 @@ setup(
     install_requires=[
         'datetime',
         'requests',
-        'tempfile',
         'toml',
     ]
 )
