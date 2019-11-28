@@ -22,7 +22,7 @@ from utils import add_to_commit, clone_repo, exec_command_and_print_error, get_f
 from utils import checkout_target_branch, get_file_content, write_error, write_into_file
 from utils import commit, commit_and_push, create_pull_request, push, revert_changes, write_msg
 from utils import create_tag_and_push, get_last_commit_date, merging_branches, publish_crate
-from utils import check_rustdoc_is_nightly
+from utils import check_rustdoc_is_nightly, check_if_up_to_date
 
 
 @contextmanager
@@ -690,6 +690,9 @@ def main(argv):
         sys.exit(1)
     if check_rustdoc_is_nightly() is False:
         return
+    if check_if_up_to_date() is False:
+        return
+    input('Please check that https://github.com/rust-lang/rust/pull/66828 is merged')
     write_msg('=> Creating temporary directory...')
     with temporary_directory() as temp_dir:
         write_msg('Temporary directory created in "{}"'.format(temp_dir))

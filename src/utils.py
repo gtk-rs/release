@@ -252,6 +252,24 @@ def get_last_commit_date(repo_name, temp_dir):
     return (success, out, err)
 
 
+def get_last_commit_hash(repo_path):
+    success, out, _ = exec_command(['bash', '-c',
+                                    'cd {} && git rev-parse HEAD'.format(repo_path)
+                                   ])
+    if success is True:
+        return out.strip()
+    return ''
+
+
+def get_repo_last_commit_hash(repo_url):
+    success, out, _ = exec_command(['bash', '-c',
+                                    'git ls-remote {} HEAD'.format(repo_url)
+                                   ])
+    if success is True:
+        return out.split('\n')[0].strip().split('\t')[0].split(' ')[0]
+    return '<unknown>'
+
+
 def merging_branches(repo_name, temp_dir, merge_branch):
     repo_path = join(temp_dir, repo_name)
     command = ['bash', '-c', 'cd {} && git merge "origin/{}"'.format(repo_path, merge_branch)]
@@ -343,4 +361,17 @@ def check_rustdoc_is_nightly():
         write_msg("Current rustdoc version isn't nightly! You need nightly to run this script!")
         return False
     write_msg('<= OK, moving on!')
+    return True
+
+def check_if_up_to_date():
+    remote_repo = "git://github.com/gtk-rs/release.git"
+    last_commit = get_last_commit_hash(".")
+    remote_last_commit = get_repo_last_commit_hash(remote_repo)
+    if last_commit != remote_last_commit:
+        write_msg("Remote repository `{}` has a different last commit than local: `{}` != `{}`"
+                  .format(remote_repo, remote_last_commit, last_commit))
+        text = input("Do you want to continue anyway? [y/N] ").strip().lower()
+        if len(text) == 0 or text != 'y':
+            write_msg("Ok, leaving then. Don't forget to update!")
+            return False
     return True
