@@ -692,6 +692,7 @@ def main(argv):
         return
     if check_if_up_to_date() is False:
         return
+    input('Please check that https://github.com/rust-lang/rust/pull/66828 is merged')
     write_msg('=> Creating temporary directory...')
     with temporary_directory() as temp_dir:
         write_msg('Temporary directory created in "{}"'.format(temp_dir))
