@@ -220,8 +220,8 @@ def build_docs(repo_name, temp_dir, extra_path, crate_name):
     # Also, we run "cargo update" in case the lgpl-docs repository has been updated (so we get the
     # last version).
     command = ['bash', '-c',
-               ('cd {} && cargo update && cargo rustdoc --no-default-features --features "{}" -- '
-                '-Z unstable-options --disable-minification').format(path, features)]
+               ('cd {} && cargo update && cargo rustdoc --no-default-features '
+                '--features "{}"').format(path, features)]
     if not exec_command_and_print_error(command):
         input("Couldn't generate docs! Try to fix it and then press ENTER to continue...")
     doc_folder = join(path, 'target/doc')
