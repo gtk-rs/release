@@ -26,7 +26,9 @@ class UpdateType:
             return "MAJOR"
         elif update == UpdateType.MEDIUM:
             return "MEDIUM"
-        return "MINOR"
+        elif update == UpdateType.MINOR:
+            return "MINOR"
+        return "UNKNOWN"
 
 
 def get_answer(text):
