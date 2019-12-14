@@ -21,10 +21,10 @@ class UpdateType:
         return None
 
     @staticmethod
-    def to_str(x):
-        if x == UpdateType.MAJOR:
+    def to_str(update):
+        if update == UpdateType.MAJOR:
             return "MAJOR"
-        elif x == UpdateType.MEDIUM:
+        elif update == UpdateType.MEDIUM:
             return "MEDIUM"
         return "MINOR"
 
@@ -57,10 +57,10 @@ def get_up_type(crate, mode, pick_update_type_for_crates, default_updates):
         mode = UpdateType.create_from_string(text)
         if mode is not None:
             if (is_sys_crate(crate) and
-                get_answer('Do you want to use this release for all other sys crates?') is True):
+                    get_answer('Do you want to use this release for all other sys crates?')):
                 default_updates['sys'] = mode
             elif (not is_sys_crate(crate) and
-                  get_answer('Do you want to use this release for all other non-sys crates?') is True):
+                  get_answer('Do you want to use this release for all other non-sys crates?')):
                 default_updates['non-sys'] = mode
             break
         write_msg('Invalid update type received: "{}". Accepted values: (MINOR|MEDIUM|MAJOR)'
