@@ -303,10 +303,10 @@ def publish_crate(repository, crate_dir_path, temp_dir, crate_name, checkout_bra
         else:
             final_success = True
             break
-        if final_success is False:
-            errors = set(error_messages)
-            write_msg('== ERRORS ==\n{}'.format('====\n'.join(errors)))
-            input("Something bad happened! Try to fix it and then press ENTER to continue...")
+    if final_success is False:
+        errors = set(error_messages)
+        write_msg('== ERRORS ==\n{}'.format('====\n'.join(errors)))
+        input("Something bad happened! Try to fix it and then press ENTER to continue...")
     write_msg('> crate {} has been published'.format(crate_name))
 
 
