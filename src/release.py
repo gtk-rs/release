@@ -304,7 +304,9 @@ def write_merged_prs(merged_prs, contributors, repo_url):
         md_content = (merged_pr.title.replace('<', '&lt;')
                       .replace('>', '&gt;')
                       .replace('[', '\\[')
-                      .replace(']', '\\]'))
+                      .replace(']', '\\]')
+                      .replace('*', '\\*')
+                      .replace('_', '\\_'))
         content += ' * [{}]({}/pull/{})\n'.format(md_content, repo_url, merged_pr.number)
     return content + '\n'
 
