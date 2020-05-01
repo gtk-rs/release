@@ -256,11 +256,11 @@ def build_docs(repo_name, temp_dir, extra_path, crate_name):
     fill_extras = len(SEARCH_INDEX_BEFORE) == 0
     found = False
     for line in lines:
-        if line.startswith('searchIndex['):
+        if line.startswith('"'):
             before = False
             # We need to be careful in here if we're in a sys repository (which should never be the
             # case!).
-            if line.startswith('searchIndex["{}"]'.format(crate_name.replace('-', '_'))):
+            if line.startswith('"{}":'.format(crate_name.replace('-', '_'))):
                 SEARCH_INDEX.append(line)
                 found = True
         elif fill_extras is True:
@@ -282,10 +282,6 @@ def end_docs_build(temp_dir):
             file.write('\n'.join(SEARCH_INDEX_BEFORE))
             file.write('\n'.join(SEARCH_INDEX))
             file.write('\n'.join(SEARCH_INDEX_AFTER))
-        command = ['bash', '-c',
-                   'cd minifier && cargo run --release -- "{}"'.format(path)]
-        if not exec_command_and_print_error(command):
-            input("Couldn't run minifier! Try to fix it and then press ENTER to continue...")
         add_to_commit(consts.DOC_REPO, temp_dir, ['.'])
     except Exception as err:
         write_error('An exception occured in "end_docs_build": {}'.format(err))
