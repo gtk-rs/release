@@ -25,6 +25,7 @@ CRATE_LIST = [
      "doc": False},
     {"crate": "atk-sys",        "repository": "sys",        "path": "atk-sys",
      "doc": False},
+    {"crate": "glib-macros",    "repository": "glib",       "path": "glib-macros"},
     # glib must be published before cairo-sys (because of macros)
     {"crate": "glib",           "repository": "glib",       "path": ""},
     {"crate": "cairo-sys-rs",   "repository": "cairo",      "path": "cairo-sys-rs",
