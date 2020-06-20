@@ -131,7 +131,7 @@ def get_highest_feature_version(v1_feature, v2_feature):
             x2_version = int(t_v2[i])
             if x1_version > x2_version:
                 return v1_feature
-            elif x1_version < x2_version:
+            if x1_version < x2_version:
                 return v2_feature
             i += 1
         except Exception:
