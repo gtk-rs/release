@@ -89,6 +89,7 @@ def write_help():
               " mainly)")
     write_msg(" * --badges-only                : only update the badges on the website")
     write_msg(" * --tags-only                  : only create new tags")
+    write_msg(" * --blog-only                  : only create blog post")
     write_msg(" * --pick-crates                : add an interactive way to pick crates")
     write_msg(" * --pick-update-type-for-crates: pick an update type for each crate")
 
@@ -102,6 +103,7 @@ class Arguments:
         self.specified_crate = None
         self.badges_only = False
         self.tags_only = False
+        self.blog_only = False
         self.crates = consts.CRATE_LIST
 
     @staticmethod
@@ -112,7 +114,7 @@ class Arguments:
                                  "ht:m:c:",
                                  ["help", "token=", "mode=", "no-push", "doc-only", "crate",
                                   "badges-only", "tags-only", "pick-update-type-for-crates",
-                                  "pick-crates"])[0] # second argument is "args"
+                                  "pick-crates", "blog-only"])[0] # second argument is "args"
         except getopt.GetoptError:
             write_help()
             return None
@@ -143,6 +145,8 @@ class Arguments:
                 instance.specified_crate = arg
             elif opt == '--tags-only':
                 instance.tags_only = True
+            elif opt == '--blog-only':
+                instance.blog_only = True
             elif opt == '--pick-crates':
                 instance.crates = []
             elif opt == '--pick-update-type-for-crates':
@@ -151,13 +155,15 @@ class Arguments:
                 write_msg('"{}": unknown option'.format(opt))
                 write_msg('Use "-h" or "--help" to see help')
                 return None
-        if instance.token is None and instance.no_push is False:
+        if instance.token is None and instance.no_push is False and instance.blog_only is False:
+            # In this case, I guess it's not an issue to not have a github token...
             write_error('Missing token argument.')
             return None
         if (instance.mode is None and
                 instance.doc_only is False and
                 instance.badges_only is False and
                 instance.tags_only is False and
+                instance.blog_only is False and
                 pick_update_type_for_crates is False):
             write_error('Missing update type argument.')
             return None
