@@ -14,9 +14,9 @@ class UpdateType:
         version_s = version_s.lower()
         if version_s == 'major':
             return UpdateType.MAJOR
-        elif version_s == 'medium':
+        if version_s == 'medium':
             return UpdateType.MEDIUM
-        elif version_s == 'minor':
+        if version_s == 'minor':
             return UpdateType.MINOR
         return None
 
@@ -24,9 +24,9 @@ class UpdateType:
     def to_str(update):
         if update == UpdateType.MAJOR:
             return "MAJOR"
-        elif update == UpdateType.MEDIUM:
+        if update == UpdateType.MEDIUM:
             return "MEDIUM"
-        elif update == UpdateType.MINOR:
+        if update == UpdateType.MINOR:
             return "MINOR"
         return "UNKNOWN"
 
@@ -50,7 +50,7 @@ def get_up_type(crate, mode, pick_update_type_for_crates, default_updates):
         return None
     if is_sys_crate(crate) and default_updates['sys'] is not None:
         return default_updates['sys']
-    elif not is_sys_crate(crate) and default_updates['non-sys'] is not None:
+    if not is_sys_crate(crate) and default_updates['non-sys'] is not None:
         return default_updates['non-sys']
     while pick_update_type_for_crates is True:
         text = input('Which kind of update do you want for "{}"? [MINOR/MEDIUM/MAJOR] '
@@ -127,7 +127,7 @@ class Arguments:
             if opt in ('-h', '--help'):
                 write_help()
                 return None
-            elif opt in ("-t", "--token"):
+            if opt in ("-t", "--token"):
                 instance.token = arg
             elif opt in ("-m", "--mode"):
                 instance.mode = UpdateType.create_from_string(arg)
@@ -159,11 +159,13 @@ class Arguments:
             # In this case, I guess it's not an issue to not have a github token...
             write_error('Missing token argument.')
             return None
+        # To make pylint happy.
+        only_checks = (instance.doc_only is False and
+                       instance.badges_only is False and
+                       instance.tags_only is False and
+                       instance.blog_only is False)
         if (instance.mode is None and
-                instance.doc_only is False and
-                instance.badges_only is False and
-                instance.tags_only is False and
-                instance.blog_only is False and
+                only_checks is False and
                 pick_update_type_for_crates is False):
             write_error('Missing update type argument.')
             return None
