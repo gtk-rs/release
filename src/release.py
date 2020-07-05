@@ -261,6 +261,8 @@ def build_docs(repo_name, temp_dir, extra_path, crate_name):
             # We need to be careful in here if we're in a sys repository (which should never be the
             # case!).
             if line.startswith('"{}":'.format(crate_name.replace('-', '_'))):
+                if line.endswith('}\\'):
+                    line = line[:-1] + ',\\'
                 SEARCH_INDEX.append(line)
                 found = True
         elif fill_extras is True:
@@ -279,7 +281,9 @@ def end_docs_build(temp_dir):
                    ['COPYRIGHT.txt', 'LICENSE-APACHE.txt', 'LICENSE-MIT.txt'])
     try:
         with open(join(path, 'search-index.js'), 'w') as file:
-            file.write('\n'.join(SEARCH_INDEX_BEFORE))
+            file.write('\n'.join(SEARCH_INDEX_BEFORE) + '\n')
+            if SEARCH_INDEX[-1].endswith("},\\"):
+                SEARCH_INDEX[-1] = SEARCH_INDEX[-1][:-2] + '\\' # we remove the last comma
             file.write('\n'.join(SEARCH_INDEX))
             file.write('\n'.join(SEARCH_INDEX_AFTER))
         add_to_commit(consts.DOC_REPO, temp_dir, ['.'])
