@@ -662,7 +662,8 @@ def start(args, temp_dir):
         if args.badges_only is False and args.tags_only is False:
             build_blog_post(repositories, temp_dir, args.token)
     if args.blog_only:
-        input("Blog post generated, press ENTER to quit (it'll remove the tmp folder and its content!)")
+        input("Blog post generated, press ENTER to quit (it'll remove the tmp folder and "
+              "its content!)")
         return
 
     checkout_crate_branches(temp_dir, repositories)
