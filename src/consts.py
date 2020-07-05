@@ -25,7 +25,7 @@ CRATE_LIST = [
      "doc": False},
     {"crate": "atk-sys",        "repository": "sys",        "path": "atk-sys",
      "doc": False},
-    {"crate": "gdkx11-sys",     "repository": "sys",        "path": "atk-sys",
+    {"crate": "gdkx11-sys",     "repository": "sys",        "path": "gdkx11-sys",
      "doc": False},
     {"crate": "glib-macros",    "repository": "glib",       "path": "glib-macros",
      "doc": False},
