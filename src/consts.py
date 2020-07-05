@@ -25,6 +25,8 @@ CRATE_LIST = [
      "doc": False},
     {"crate": "atk-sys",        "repository": "sys",        "path": "atk-sys",
      "doc": False},
+    {"crate": "gdkx11-sys",     "repository": "sys",        "path": "atk-sys",
+     "doc": False},
     {"crate": "glib-macros",    "repository": "glib",       "path": "glib-macros"},
     # glib must be published before cairo-sys (because of macros)
     {"crate": "glib",           "repository": "glib",       "path": ""},
@@ -46,6 +48,7 @@ CRATE_LIST = [
     {"crate": "gdk-pixbuf",     "repository": "gdk-pixbuf", "path": ""},
     {"crate": "gdk",            "repository": "gdk",        "path": ""},
     {"crate": "gtk",            "repository": "gtk",        "path": ""},
+    {"crate": "gdkx11",         "repository": "gdkx11",     "path": ""},
     {"crate": "sourceview",     "repository": "sourceview", "path": ""},
     {"crate": "pangocairo",     "repository": "pangocairo", "path": ""},
     {"crate": "gtk-test",       "repository": "gtk-test",   "path": "", "doc": False},
