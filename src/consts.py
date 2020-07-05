@@ -26,7 +26,7 @@ CRATE_LIST = [
     {"crate": "atk-sys",        "repository": "sys",        "path": "atk-sys",
      "doc": False},
     {"crate": "gdkx11-sys",     "repository": "sys",        "path": "gdkx11-sys",
-     "doc": False},
+     "doc_name": "gdk_x11_sys", "doc": False,},
     {"crate": "glib-macros",    "repository": "glib",       "path": "glib-macros",
      "doc": False},
     # glib must be published before cairo-sys (because of macros)
