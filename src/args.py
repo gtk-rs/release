@@ -160,9 +160,9 @@ class Arguments:
             write_error('Missing token argument.')
             return None
         # To make pylint happy.
-        only_checks = (instance.doc_only is False and
-                       instance.badges_only is False and
-                       instance.tags_only is False and
+        only_checks = (instance.doc_only is False or
+                       instance.badges_only is False or
+                       instance.tags_only is False or
                        instance.blog_only is False)
         if (instance.mode is None and
                 only_checks is False and
