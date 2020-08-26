@@ -230,8 +230,9 @@ def add_to_commit(repo_name, temp_dir, files_to_add):
 def revert_changes(repo_name, temp_dir, files):
     repo_path = join(temp_dir, repo_name)
     command = ['bash', '-c',
-               'cd {} && git checkout -- {}'.format(repo_path,
-                                                    ' '.join(['"{}"'.format(f) for f in files]))]
+               'cd {0} && git rm -f {1} && git checkout -- {1}'.format(
+                   repo_path,
+                   ' '.join(['"{}"'.format(f) for f in files]))]
     if not exec_command_and_print_error(command):
         input("Fix the error and then press ENTER")
 
