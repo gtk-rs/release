@@ -9,7 +9,7 @@ import shutil
 import sys
 import tempfile
 from os import listdir, sep as os_sep
-from os.path import isdir, isfile, join
+from os.path import isfile, join
 
 # local imports
 import consts
@@ -203,9 +203,7 @@ def update_badges(repo_name, temp_dir, specified_crate):
 
 def cleanup_doc_repo(temp_dir):
     path = join(temp_dir, consts.DOC_REPO)
-    dirs = ' '.join(['"{}"'.format(join(path, f)) for f in listdir(path)
-                     if isdir(join(path, f)) and f.startswith('.') is False])
-    command = ['bash', '-c', 'cd {} && rm -rf {}'.format(path, dirs)]
+    command = ['bash', '-c', 'cd {} && git rm -rf *'.format(path)]
     if not exec_command_and_print_error(command):
         input("Couldn't clean up docs! Try to fix it and then press ENTER to continue...")
 
