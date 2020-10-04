@@ -5,7 +5,7 @@ setup(
     name='release',
     version=__version__,
     author=__author__,
-    url='http://github.com/gtk-rs/release',
+    url='https://github.com/gtk-rs/release',
     description='Release script',
     package_dir={'src': 'src'},
     packages=find_packages(),
