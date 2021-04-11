@@ -347,23 +347,6 @@ def create_pull_request(repo_name, from_branch, target_branch, token, add_to_lis
             PULL_REQUESTS.append('> {}'.format(req['html_url']))
 
 
-def check_rustdoc_is_nightly():
-    write_msg("=> Checking if default rustdoc is the nightly one...")
-    ret, stdout, stderr = exec_command(['bash', '-c', 'rustdoc --version'])
-    if ret is False:
-        write_msg("Failed to run `rustdoc --version`...\n{}".format(stderr))
-        return False
-    parts = stdout.split(' ')
-    if len(parts) < 3:
-        write_msg("Failed to get version from `rustdoc --version`...\n{}\n{}"
-                  .format(stdout, stderr))
-        return False
-    if not parts[1].endswith('-nightly'):
-        write_msg("Current rustdoc version isn't nightly! You need nightly to run this script!")
-        return False
-    write_msg('<= OK, moving on!')
-    return True
-
 def check_if_up_to_date():
     remote_repo = "git://github.com/gtk-rs/release.git"
     last_commit = get_last_commit_hash(".")
