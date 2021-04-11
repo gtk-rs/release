@@ -65,7 +65,7 @@ def exec_command_and_print_error(command, timeout=None):
 
 
 def clone_repo(repo_name, temp_dir, depth=None):
-    repo_url = '{}/{}/{}'.format(consts.GITHUB_URL, consts.ORGANIZATION, repo_name)
+    repo_url = '{}/{}/{}.git'.format(consts.GIT_URL, consts.ORGANIZATION, repo_name)
     target_dir = join(temp_dir, repo_name)
     try:
         write_msg('=> Cloning "{}" from "{}"'.format(repo_name, repo_url))
@@ -324,7 +324,7 @@ def create_pull_request(repo_name, from_branch, target_branch, token, add_to_lis
                                                      repo_name),
                        token,
                        {'title': '[release] merging {} into {}'.format(from_branch, target_branch),
-                        'body': 'cc @GuillaumeGomez @EPashkin @sdroege',
+                        'body': 'cc @GuillaumeGomez @sdroege @bilelmoussaoui',
                         'base': target_branch,
                         'head': from_branch,
                         'maintainer_can_modify': True})
