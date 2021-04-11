@@ -37,8 +37,6 @@ CRATE_LIST = [
      "doc": False},
     {"crate": "gtk-sys",        "repository": "sys",        "path": "gtk-sys",
      "doc": False},
-    {"crate": "gtk-source-sys", "repository": "sourceview", "path": "sourceview-sys",
-     "doc": False},
     {"crate": "pangocairo-sys", "repository": "sys",        "path": "pangocairo-sys",
      "doc_name": "pango_cairo_sys", "doc": False},
     {"crate": "atk",            "repository": "atk",        "path": ""},
@@ -50,7 +48,6 @@ CRATE_LIST = [
     {"crate": "gdk",            "repository": "gdk",        "path": ""},
     {"crate": "gtk",            "repository": "gtk",        "path": ""},
     {"crate": "gdkx11",         "repository": "gdkx11",     "path": ""},
-    {"crate": "sourceview",     "repository": "sourceview", "path": ""},
     {"crate": "pangocairo",     "repository": "pangocairo", "path": ""},
     {"crate": "gtk-test",       "repository": "gtk-test",   "path": "", "doc": False},
 ]
