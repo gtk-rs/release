@@ -1,8 +1,0 @@
-dist: xenial
-language: python
-addons:
-  apt:
-    packages:
-    - pylint3
-script:
-  - pylint3 ./src
