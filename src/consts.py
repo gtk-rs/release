@@ -7,8 +7,6 @@ MASTER_TMP_BRANCH = "master-release-update"
 CRATE_TMP_BRANCH = "crate-release-update"
 
 BLOG_REPO = "gtk-rs.github.io"
-DOC_REPO = "docs"
-DOC_REPO_BRANCH = "gh-pages"
 DOC_CONTENT_REPO = "lgpl-docs"
 
 CRATE_LIST = [

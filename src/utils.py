@@ -8,7 +8,6 @@ import requests
 # local import
 import consts
 from globals import PULL_REQUESTS
-from my_toml import TomlHandler
 
 
 def write_error(error_msg):
@@ -141,45 +140,6 @@ def get_highest_feature_version(v1_feature, v2_feature):
     return v1_feature
 
 
-# This function does two things:
-#
-# 1. Check if dox feature is present or try getting the highest version feature
-# 2. Getting all the other features (for cairo it's very important)
-def get_features(path):
-    # pylint: disable=too-many-branches
-    features = []
-    highest_version = None
-    content = get_file_content(path)
-    if content is None:
-        return ''
-    toml = TomlHandler(content)
-    dox_present = False
-    for section in toml.sections:
-        if section.name == 'features':
-            for entry in section.entries:
-                if entry['key'] in ['purge-lgpl-docs', 'default']:
-                    continue
-                if entry['key'] == 'dox':
-                    dox_present = True
-                if entry['key'].startswith('v'):
-                    if highest_version is None:
-                        highest_version = entry['key']
-                    else:
-                        highest_version = get_highest_feature_version(highest_version, entry['key'])
-                else:
-                    features.append(entry['key'])
-    if dox_present is True:
-        if 'dox' not in features:
-            features.append('dox')
-    elif highest_version is not None:
-        write_msg("/!\\ Seems there is no dox feature so let's just use the highest version "
-                  "instead...")
-        features.append(highest_version)
-    else:
-        write_msg("/!\\ That's weird: no dox or version feature. Is everything fine with this one?")
-    return ' '.join(features)
-
-
 # def compare_versions(v1, v2):
 #     v1 = v1.split('.')
 #     v2 = v2.split('.')
@@ -223,16 +183,6 @@ def add_to_commit(repo_name, temp_dir, files_to_add):
     repo_path = join(temp_dir, repo_name)
     command = ['bash', '-c', 'cd {} && git add {}'
                .format(repo_path, ' '.join(['"{}"'.format(f) for f in files_to_add]))]
-    if not exec_command_and_print_error(command):
-        input("Fix the error and then press ENTER")
-
-
-def revert_changes(repo_name, temp_dir, files):
-    repo_path = join(temp_dir, repo_name)
-    command = ['bash', '-c',
-               'cd {0} && git rm -f {1} && git checkout -- {1}'.format(
-                   repo_path,
-                   ' '.join(['"{}"'.format(f) for f in files]))]
     if not exec_command_and_print_error(command):
         input("Fix the error and then press ENTER")
 
