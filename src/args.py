@@ -84,6 +84,7 @@ def write_help():
     write_msg(" * -t <token> | --token=<token> : give the github token")
     write_msg(" * -m <mode> | --mode=<mode>    : give the update type (MINOR|MEDIUM|MAJOR)")
     write_msg(" * --no-push                    : performs all operations but doesn't push anything")
+    write_msg(" * --doc-only                   : only builds documentation")
     write_msg(" * -c <crate> | --crate=<crate> : only update the given crate (for test purpose"
               " mainly)")
     write_msg(" * --badges-only                : only update the badges on the website")
@@ -98,6 +99,7 @@ class Arguments:
         self.token = None
         self.mode = None
         self.no_push = False
+        self.doc_only = False
         self.specified_crate = None
         self.badges_only = False
         self.tags_only = False
@@ -110,7 +112,7 @@ class Arguments:
         try:
             opts = getopt.getopt(argv,
                                  "ht:m:c:",
-                                 ["help", "token=", "mode=", "no-push", "crate",
+                                 ["help", "token=", "mode=", "no-push", "doc-only", "crate",
                                   "badges-only", "tags-only", "pick-update-type-for-crates",
                                   "pick-crates", "blog-only"])[0] # second argument is "args"
         except getopt.GetoptError:
@@ -135,6 +137,8 @@ class Arguments:
                     return None
             elif opt == "--no-push":
                 instance.no_push = True
+            elif opt == "--doc-only":
+                instance.doc_only = True
             elif opt == "--badges-only":
                 instance.badges_only = True
             elif opt in ('-c', '--crate'):
@@ -156,7 +160,8 @@ class Arguments:
             write_error('Missing token argument.')
             return None
         # To make pylint happy.
-        only_checks = (instance.badges_only is False or
+        only_checks = (instance.doc_only is False or
+                       instance.badges_only is False or
                        instance.tags_only is False or
                        instance.blog_only is False)
         if (instance.mode is None and
