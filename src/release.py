@@ -8,20 +8,21 @@ import time
 import shutil
 import sys
 import tempfile
-from os import sep as os_sep
-from os.path import join
+from os import listdir, sep as os_sep
+from os.path import isfile, join
 
 # local imports
 import consts
 from args import Arguments, UpdateType
 from github import Github
-from globals import CRATES_VERSION, PULL_REQUESTS
+from globals import CRATES_VERSION, PULL_REQUESTS, SEARCH_INDEX, SEARCH_INDEX_BEFORE
+from globals import SEARCH_INDEX_AFTER
 from my_toml import TomlHandler
-from utils import add_to_commit, clone_repo
+from utils import add_to_commit, clone_repo, exec_command_and_print_error, get_features
 from utils import checkout_target_branch, get_file_content, write_error, write_into_file
-from utils import commit, commit_and_push, create_pull_request, push, write_msg
+from utils import commit, commit_and_push, create_pull_request, push, revert_changes, write_msg
 from utils import create_tag_and_push, get_last_commit_date, merging_branches, publish_crate
-from utils import check_if_up_to_date
+from utils import check_rustdoc_is_nightly, check_if_up_to_date
 
 
 @contextmanager
@@ -200,6 +201,97 @@ def update_badges(repo_name, temp_dir, specified_crate):
     return write_into_file(path, ''.join(out).replace('\n\n', '\n'))
 
 
+def cleanup_doc_repo(temp_dir):
+    path = join(temp_dir, consts.DOC_REPO)
+    command = ['bash', '-c', 'cd {} && git rm -rf *'.format(path)]
+    if not exec_command_and_print_error(command):
+        input("Couldn't clean up docs! Try to fix it and then press ENTER to continue...")
+
+
+def build_docs(repo_name, temp_dir, extra_path, crate_name):
+    # pylint: disable=too-many-locals
+    path = join(join(temp_dir, repo_name), extra_path)
+    features = get_features(join(path, 'Cargo.toml'))
+    # We can't add "--no-deps" argument to cargo doc, otherwise we lose links to items of
+    # other crates...
+    #
+    # Also, we run "cargo update" in case the lgpl-docs repository has been updated (so we get the
+    # last version).
+    command = ['bash', '-c',
+               ('cd {} && cargo update && cargo rustdoc --no-default-features '
+                '--features "{}"').format(path, features)]
+    if not exec_command_and_print_error(command):
+        input("Couldn't generate docs! Try to fix it and then press ENTER to continue...")
+    doc_folder = join(path, 'target/doc')
+    try:
+        file_list = ' '.join(['"{}"'.format(f) for f in listdir(doc_folder)
+                              if isfile(join(doc_folder, f))])
+    except Exception as err:
+        write_error('Error occured in build docs: {}'.format(err))
+        input("It seems like the \"{}\" folder doesn't exist. Try to fix it then press ENTER..."
+              .format(doc_folder))
+    # Copy documentation files
+    command = ['bash', '-c',
+               'cd {} && cp -r "{}" {} "{}"'
+               .format(doc_folder,
+                       crate_name.replace('-', '_'),
+                       file_list,
+                       join(temp_dir, consts.DOC_REPO))]
+    if not exec_command_and_print_error(command):
+        input("Couldn't copy docs! Try to fix it and then press ENTER to continue...")
+    # Copy source files
+    destination = "{}/src".format(join(temp_dir, consts.DOC_REPO))
+    command = ['bash', '-c',
+               'cd {0} && mkdir -p "{1}" && cp -r "src/{2}" "{1}/"'
+               .format(doc_folder,
+                       destination,
+                       crate_name.replace('-', '_'))]
+    if not exec_command_and_print_error(command):
+        input("Couldn't copy doc source files! Try to fix it and then press ENTER to continue...")
+    search_index = join(path, 'target/doc/search-index.js')
+    lines = get_file_content(search_index).split('\n')
+    before = True
+    fill_extras = len(SEARCH_INDEX_BEFORE) == 0
+    found = False
+    for line in lines:
+        if line.startswith('"'):
+            before = False
+            # We need to be careful in here if we're in a sys repository (which should never be the
+            # case!).
+            if line.startswith('"{}":'.format(crate_name.replace('-', '_'))):
+                if line.endswith('}\\'):
+                    line = line[:-1] + ',\\'
+                SEARCH_INDEX.append(line)
+                found = True
+        elif fill_extras is True:
+            if before is True:
+                SEARCH_INDEX_BEFORE.append(line)
+            else:
+                SEARCH_INDEX_AFTER.append(line)
+    if found is False:
+        input("Couldn't find \"{}\" in `{}`!\nTry to fix it and then press ENTER to continue..."
+              .format(crate_name.replace('-', '_'), search_index))
+
+
+def end_docs_build(temp_dir):
+    path = join(temp_dir, consts.DOC_REPO)
+    revert_changes(consts.DOC_REPO, temp_dir,
+                   ['COPYRIGHT.txt', 'LICENSE-APACHE.txt', 'LICENSE-MIT.txt'])
+    try:
+        with open(join(path, 'search-index.js'), 'w') as file:
+            file.write('\n'.join(SEARCH_INDEX_BEFORE) + '\n')
+            if SEARCH_INDEX[-1].endswith("},\\"):
+                SEARCH_INDEX[-1] = SEARCH_INDEX[-1][:-2] + '\\' # we remove the last comma
+            file.write('\n'.join(SEARCH_INDEX))
+            file.write('\n'.join(SEARCH_INDEX_AFTER))
+        add_to_commit(consts.DOC_REPO, temp_dir, ['.'])
+    except Exception as err:
+        write_error('An exception occured in "end_docs_build": {}'.format(err))
+        input("Press ENTER to continue...")
+    input('If you want to prevent "{}" to be updated, now is the good time! Press ENTER to '
+          'continue...'.format(join(path, "main.js")))
+
+
 def write_merged_prs(merged_prs, contributors, repo_url):
     content = ''
     for merged_pr in reversed(merged_prs):
@@ -324,6 +416,59 @@ def generate_new_branches(repository, temp_dir, specified_crate, args):
             push(repository, temp_dir, branch_name)
 
 
+def update_doc_content_repository(repositories, temp_dir, token, no_push, args):
+    if clone_repo(consts.DOC_CONTENT_REPO, temp_dir) is False:
+        input('Try to fix the problem then press ENTER to continue...')
+    write_msg("Done!")
+    repo_path = join(temp_dir, consts.DOC_CONTENT_REPO)
+    write_msg("=> Generating documentation for crates...")
+    for repo in repositories:
+        current = None
+        for crate in args.crates:
+            crate = crate['crate']
+            if crate['repository'] == repo:
+                current = crate
+                break
+        if current is None:
+            input('No repository matches "{}", something is weird. (Press ENTER TO CONTINUE)')
+            continue
+        if current.get("doc", True) is False:
+            continue
+        write_msg('==> Generating documentation for "{}"'.format(current))
+        path = join(temp_dir, current['repository'])
+        command = ['bash', '-c',
+                   'cd {} && make doc && mv vendor.md {}'.format(path,
+                                                                 join(repo_path,
+                                                                      current['crate']))]
+        if not exec_command_and_print_error(command):
+            input("Fix the error and then press ENTER")
+    write_msg('Done!')
+    write_msg('Committing "{}" changes...'.format(consts.DOC_CONTENT_REPO))
+    commit(consts.DOC_CONTENT_REPO, temp_dir, "Update vendor files")
+    if no_push is False:
+        push(consts.DOC_CONTENT_REPO, temp_dir, consts.MASTER_TMP_BRANCH)
+
+    # We always make minor releases in here, no need for a more important one considering we don't
+    # change the API.
+    if update_repo_version(consts.DOC_CONTENT_REPO, consts.DOC_CONTENT_REPO, "",
+                           temp_dir, UpdateType.MINOR, False) is False:
+        write_error('The update for the "{}" crate failed...'.format(consts.DOC_CONTENT_REPO))
+        input('Fix the error and then press ENTER')
+    commit(consts.DOC_CONTENT_REPO, temp_dir, "Update version")
+    if no_push is False:
+        push(consts.DOC_CONTENT_REPO, temp_dir, consts.MASTER_TMP_BRANCH)
+        create_pull_request(consts.DOC_CONTENT_REPO, consts.MASTER_TMP_BRANCH, "master", token,
+                            False)
+        input(('All done with the "{}" update: please merge the PR then press ENTER so the '
+               'publication can performed...').format(consts.DOC_CONTENT_REPO))
+        publish_crate(consts.DOC_CONTENT_REPO, "", temp_dir, consts.DOC_CONTENT_REPO,
+                      checkout_branch='master')
+        write_msg('Ok all done! We can move forward now!')
+    else:
+        write_msg(('All with "{}", you still need to publish a new version if you want the changes '
+                   'to be taken into account').format(consts.DOC_CONTENT_REPO))
+
+
 def clone_repositories(args, temp_dir):
     write_msg('=> Cloning the repositories...')
     repositories = []
@@ -339,8 +484,12 @@ def clone_repositories(args, temp_dir):
     if len(repositories) < 1:
         write_msg('No crate "{}" found. Aborting...'.format(args.specified_crate))
         return []
-    if clone_repo(consts.BLOG_REPO, temp_dir, depth=1) is False:
-        write_error('Cannot clone the "{}" repository...'.format(consts.BLOG_REPO))
+    if args.doc_only is False:
+        if clone_repo(consts.BLOG_REPO, temp_dir, depth=1) is False:
+            write_error('Cannot clone the "{}" repository...'.format(consts.BLOG_REPO))
+            return []
+    if clone_repo(consts.DOC_REPO, temp_dir, depth=1) is False:
+        write_error('Cannot clone the "{}" repository...'.format(consts.DOC_REPO))
         return []
     write_msg('Done!')
     return repositories
@@ -435,7 +584,7 @@ def create_example_repository_pull_request(args):
 
 
 def generate_tags_and_version_branches(args, temp_dir, repositories):
-    if args.no_push is True or args.badges_only is True:
+    if args.no_push is True or args.doc_only is True or args.badges_only is True:
         return
     write_msg("=> Generating tags and branches...")
     for repo in repositories:
@@ -444,8 +593,44 @@ def generate_tags_and_version_branches(args, temp_dir, repositories):
     write_msg('Done!')
 
 
+def regenerate_documentation(args, temp_dir, repositories):
+    if args.badges_only is True or args.tags_only is True:
+        return
+    input("About to regenerate documentation. Are you sure you want to continue? " +
+          "(Press ENTER to continue)")
+    update_doc_content_repository(repositories, temp_dir, args.token, args.no_push, args)
+    write_msg('=> Preparing doc repo (too much dark magic in here urg)...')
+    cleanup_doc_repo(temp_dir)
+    write_msg('Done!')
+
+    write_msg('=> Building docs...')
+    for crate in args.crates:
+        crate = crate['crate']
+        if crate['crate'] == 'gtk-test':
+            continue
+        write_msg('-> Building docs for {}...'.format(crate['crate']))
+        build_docs(crate['repository'], temp_dir, crate['path'],
+                   crate.get('doc_name', crate['crate']))
+    end_docs_build(temp_dir)
+    write_msg('Done!')
+
+    write_msg('=> Committing{} docs to the "{}" branch...'
+              .format(" and pushing" if args.no_push is False else "",
+                      consts.CRATE_TMP_BRANCH))
+    commit(consts.DOC_REPO, temp_dir, "Regen docs")
+    if args.no_push is False:
+        push(consts.DOC_REPO, temp_dir, consts.CRATE_TMP_BRANCH)
+        create_pull_request(
+            consts.DOC_REPO,
+            consts.CRATE_TMP_BRANCH,
+            "gh-pages",
+            args.token)
+        write_msg("New pull request(s):\n\n{}\n".format('\n'.join(PULL_REQUESTS)))
+    write_msg('Done!')
+
+
 def update_gtk_rs_blog(args, temp_dir):
-    if args.tags_only is True:
+    if args.doc_only is True or args.tags_only is True:
         return
     write_msg('=> Updating blog...')
     if update_badges(consts.BLOG_REPO, temp_dir, args.specified_crate) is False:
@@ -472,11 +657,12 @@ def start(args, temp_dir):
     repositories = clone_repositories(args, temp_dir)
     if len(repositories) < 1:
         return
-    if (args.blog_only is False and
-            update_crates_versions(args, temp_dir, repositories) is False):
-        return
-    if args.badges_only is False and args.tags_only is False:
-        build_blog_post(repositories, temp_dir, args.token)
+    if args.doc_only is False:
+        if (args.blog_only is False and
+                update_crates_versions(args, temp_dir, repositories) is False):
+            return
+        if args.badges_only is False and args.tags_only is False:
+            build_blog_post(repositories, temp_dir, args.token)
     if args.blog_only:
         input("Blog post generated, press ENTER to quit (it'll remove the tmp folder and "
               "its content!)")
@@ -484,7 +670,7 @@ def start(args, temp_dir):
 
     checkout_crate_branches(temp_dir, repositories)
 
-    if args.badges_only is False and args.tags_only is False:
+    if args.doc_only is False and args.badges_only is False and args.tags_only is False:
         if update_crate_repositories_branches(args, temp_dir, repositories) is False:
             return
         if args.no_push is False:
@@ -493,9 +679,12 @@ def start(args, temp_dir):
 
     generate_tags_and_version_branches(args, temp_dir, repositories)
 
+    regenerate_documentation(args, temp_dir, repositories)
+
     update_gtk_rs_blog(args, temp_dir)
 
     write_msg('Seems like most things are done! Now remains:')
+    write_msg(" * Check generated docs for all crates (don't forget to enable features!).")
     input('Press ENTER to leave (once done, the temporary directory "{}" will be destroyed)'
           .format(temp_dir))
 
@@ -504,6 +693,8 @@ def main(argv):
     args = Arguments.parse_arguments(argv)
     if args is None:
         sys.exit(1)
+    if check_rustdoc_is_nightly() is False:
+        return
     if check_if_up_to_date() is False:
         return
     write_msg('=> Creating temporary directory...')
