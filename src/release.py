@@ -490,7 +490,7 @@ def push_new_version_branches_and_tags(args, temp_dir, repositories):
                         'Update Cargo.toml format for release',
                         shorter_version(CRATES_VERSION[crate['crate']]))
                 create_tag_and_push(
-                    shorter_version(CRATES_VERSION[crate['crate']]),
+                    CRATES_VERSION[crate['crate']],
                     repository,
                     temp_dir)
                 break
