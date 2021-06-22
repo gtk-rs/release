@@ -404,6 +404,7 @@ def generate_new_branches(repository, temp_dir, specified_crate, args):
             write_msg('==> Creating new branch "{}" for repository "{}"...'.format(branch_name,
                                                                                    repository))
             checkout_to_new_branch(repository, temp_dir, branch_name)
+            return
 
 
 def clone_repositories(args, temp_dir):
