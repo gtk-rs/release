@@ -289,7 +289,7 @@ For the interested ones, here is the list of the merged pull requests:
     # oldest_date = None
     # pylint: disable=fixme
     # TODO: To be removed once this release is done.
-    oldest_date = datetime.datetime(2020, 8, 26)
+    oldest_date = datetime.date(2020, 8, 26)
 
     for repo in repositories:
         # checkout_target_branch(repo, temp_dir, "crate")
