@@ -290,8 +290,10 @@ def publish_crate(repository, crate_dir_path, temp_dir, crate_name, checkout_bra
     write_msg('=> publishing crate {}'.format(crate_name))
     path = join(join(temp_dir, repository), crate_dir_path)
     # In case we needed to fix bugs, we checkout to crate branch before publishing crate.
-    command = ['bash', '-c', 'cd {} && git checkout {} && cargo publish'.format(path,
-                                                                                checkout_branch)]
+    command = [
+        'bash',
+        '-c',
+        'cd {} && git checkout {} && cargo publish --no-verify'.format(path, checkout_branch)]
     retry = 3
     error_messages = []
     final_success = False
