@@ -202,13 +202,13 @@ def update_crate_cargo_file(repo_name, crate_dir_path, temp_dir):
                     crate_name = get_crate(entry['key'])
                 if crate_name is not None:
                     if info.strip().startswith('{'):
-                        parts = [y.strip() for y in info[1:-1].split('",')]
+                        parts = [y.strip() for y in info[1:-1].split(',')]
                         parts = [y for y in parts
                                  if (not y.startswith("git ") and
                                         not y.startswith("git=") and
                                         not y.startswith("path ") and
                                         not y.startswith("path="))]
-                        parts.insert(0, 'version = {}'.format(CRATES_VERSION[crate_name]))
+                        parts.append('version = {}'.format(CRATES_VERSION[crate_name]))
                         if len(parts) > 1:
                             entry['value'] = '{{{}}}'.format(', '.join(parts))
                         else:
