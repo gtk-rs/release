@@ -18,7 +18,7 @@ from github import Github
 from globals import CRATES_VERSION, PULL_REQUESTS
 from my_toml import TomlHandler
 from utils import add_to_commit, clone_repo
-from utils import checkout_target_branch, get_file_content, write_error, write_into_file
+from utils import get_file_content, write_error, write_into_file
 from utils import commit, commit_and_push, create_pull_request, push, write_msg
 from utils import create_tag_and_push, publish_crate#, get_last_commit_date
 from utils import check_if_up_to_date, checkout_to_new_branch
@@ -227,64 +227,6 @@ def update_crate_cargo_file(repo_name, crate_dir_path, temp_dir):
     return result
 
 
-def update_repo_version(repo_name, crate_name, crate_dir_path, temp_dir, update_type, no_update):
-    # pylint: disable=too-many-branches,too-many-locals
-    file_path = join(join(join(temp_dir, repo_name), crate_dir_path), "Cargo.toml")
-    output = file_path.replace(temp_dir, "")
-    if output.startswith('/'):
-        output = output[1:]
-    write_msg('=> Updating versions for {}'.format(file_path))
-    content = get_file_content(file_path)
-    if content is None:
-        return False
-    toml = TomlHandler(content)
-    versions_update = []
-    for section in toml.sections:
-        if (section.name == 'package' or
-                (section.name.startswith('dependencies.') and find_crate(section.name[13:]))):
-            version = section.get('version', None)
-            if version is None:
-                continue
-            new_version = None
-            if no_update is False:
-                new_version = update_version(version, update_type, section.name)
-            else:
-                new_version = version
-            if new_version is None:
-                return False
-            # Print the status directly if it's the crate's version.
-            if section.name == 'package':
-                write_msg('\t{}: {} => {}'.format(output.split(os_sep)[-2], version, new_version))
-                CRATES_VERSION[crate_name] = new_version
-            else:  # Otherwise add it to the list to print later.
-                versions_update.append({'dependency_name': section.name[13:],
-                                        'old_version': version,
-                                        'new_version': new_version})
-            section.set('version', new_version)
-        elif section.name == 'dependencies':
-            for entry in section.entries:
-                if find_crate(entry['key']):
-                    new_version = check_and_update_version(section.entries[entry],
-                                                           update_type,
-                                                           entry,
-                                                           [])
-                    section.set(entry, new_version)
-    for update in versions_update:
-        write_msg('\t{}: {} => {}'.format(update['dependency_name'],
-                                          update['old_version'],
-                                          update['new_version']))
-    out = str(toml)
-    if not out.endswith("\n"):
-        out += '\n'
-    result = True
-    if no_update is False:
-        # We only write into the file if we're not just getting the crates version.
-        result = write_into_file(file_path, out)
-        write_msg('=> {}: {}'.format(output.split(os_sep)[-2],
-                                     'Failure' if result is False else 'Success'))
-    return result
-
-
 def write_merged_prs(merged_prs, contributors, repo_url):
     content = ''
     for merged_pr in reversed(merged_prs):
@@ -467,39 +409,6 @@ def clone_repositories(args, temp_dir):
     return repositories
 
 
-def update_crates_versions(args, temp_dir, repositories):
-    write_msg('=> Updating [master] crates version...')
-    for repository in repositories:
-        checkout_target_branch(repository, temp_dir, 'master')
-    for crate in args.crates:
-        update_type = crate['up-type']
-        crate = crate['crate']
-        if args.specified_crate is not None and crate['crate'] != args.specified_crate:
-            continue
-        if update_repo_version(crate["repository"], crate["crate"], crate["path"],
-                               temp_dir, update_type,
-                               args.tags_only) is False:
-            write_error('The update for the "{}" crate failed...'.format(crate["crate"]))
-            return False
-    write_msg('Done!')
-    if args.tags_only is False:
-        write_msg('=> Committing{} to the "{}" branch...'
-                  .format(" and pushing" if args.no_push is False else "",
-                          consts.MASTER_TMP_BRANCH))
-        for repo in repositories:
-            commit(repo, temp_dir, "Update versions for next release [ci skip]")
-            if args.no_push is False:
-                push(repo, temp_dir, consts.MASTER_TMP_BRANCH)
-        write_msg('Done!')
-
-        if args.no_push is False:
-            write_msg('=> Creating PRs on master branch...')
-            for repo in repositories:
-                create_pull_request(repo, consts.MASTER_TMP_BRANCH, "master", args.token)
-            write_msg('Done!')
-    return True
-
-
 def publish_crates(args, temp_dir):
     write_msg('+++++++++++++++')
     write_msg('++ IMPORTANT ++')
@@ -551,18 +460,15 @@ def start(args, temp_dir):
     if args.no_push is False:
         push_new_version_branches_and_tags(args, temp_dir, repositories)
 
-    if args.tags_only is False:
-        build_blog_post(repositories, temp_dir, args.token, args)
-    if args.blog_only:
-        input("Blog post generated, press ENTER to quit (it'll remove the tmp folder and "
-              "its content!)")
-        return
+    # if args.tags_only is False:
+    #     build_blog_post(repositories, temp_dir, args.token, args)
+    # if args.blog_only:
+    #     input("Blog post generated, press ENTER to quit (it'll remove the tmp folder and "
+    #           "its content!)")
+    #     return
 
     if args.tags_only is False and args.no_push is False:
         publish_crates(args, temp_dir)
-
-    if update_crates_versions(args, temp_dir, repositories) is False:
-        return
 
     write_msg("Everything is almost done now. Just need to merge the remaining pull requests...")
     write_msg("\n{}\n".format('\n'.join(PULL_REQUESTS)))
