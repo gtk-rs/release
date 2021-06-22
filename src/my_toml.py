@@ -25,6 +25,9 @@ class Section:
                 return
         self.entries.append({'key': key, 'value': value})
 
+    def clear(self):
+        self.entries = {}
+
     def get(self, key, default_value):
         for entry in self.entries:
             if entry['key'] == key:

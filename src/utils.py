@@ -45,6 +45,7 @@ def write_into_file(file_path, content):
 
 
 def exec_command(command, timeout=None):
+    # pylint: disable=consider-using-with
     child = subprocess.Popen(command, stdout=subprocess.PIPE,
                              stderr=subprocess.PIPE)
     stdout, stderr = child.communicate(timeout=timeout)
@@ -240,6 +241,13 @@ def revert_changes(repo_name, temp_dir, files):
 def checkout_target_branch(repo_name, temp_dir, target_branch):
     repo_path = join(temp_dir, repo_name)
     command = ['bash', '-c', 'cd {} && git checkout {}'.format(repo_path, target_branch)]
+    if not exec_command_and_print_error(command):
+        input("Fix the error and then press ENTER")
+
+
+def checkout_to_new_branch(repo_name, temp_dir, target_branch):
+    repo_path = join(temp_dir, repo_name)
+    command = ['bash', '-c', 'cd {} && git checkout -b {}'.format(repo_path, target_branch)]
     if not exec_command_and_print_error(command):
         input("Fix the error and then press ENTER")
 
