@@ -84,13 +84,6 @@ def check_and_update_version(entry, update_type, dependency_name, versions_updat
     return '{{{}}}'.format(', '.join(['{} = {}'.format(entry, dic[entry]) for entry in dic]))
 
 
-def find_crate(crate_name):
-    for entry in consts.CRATE_LIST:
-        if entry['crate'] == crate_name:
-            return True
-    return False
-
-
 def update_crate_version(repo_name, crate_name, crate_dir_path, temp_dir, specified_crate):
     file_path = join(join(join(temp_dir, repo_name), crate_dir_path), "Cargo.toml")
     output = file_path.replace(temp_dir, "")
@@ -160,6 +153,27 @@ def update_crates_cargo_file(args, temp_dir):
         update_crate_cargo_file(crate["repository"], crate["path"], temp_dir)
 
 
+def get_crate(crate_name):
+    for entry in consts.CRATE_LIST:
+        if entry['crate'] == crate_name:
+            return crate_name
+    return None
+
+
+def find_crate(crate_name):
+    return get_crate(crate_name) is not None
+
+
+def get_crate_in_package(value):
+    if not value.strip().startswith('{'):
+        return None
+    parts = [y.strip() for y in value[1:-1].split('",')]
+    for part in parts:
+        if part.split('=')[0].strip() == 'package':
+            return get_crate(part.split('=')[1].replace('"', '').strip())
+    return None
+
+
 def update_crate_cargo_file(repo_name, crate_dir_path, temp_dir):
     # pylint: disable=too-many-branches,too-many-locals,too-many-nested-blocks
     file_path = join(join(join(temp_dir, repo_name), crate_dir_path), "Cargo.toml")
@@ -172,14 +186,21 @@ def update_crate_cargo_file(repo_name, crate_dir_path, temp_dir):
         return False
     toml = TomlHandler(content)
     for section in toml.sections:
-        if section.name.startswith('dependencies.') and find_crate(section.name[13:]):
-            section.remove("path")
-            section.remove("git")
-            section.set('version', CRATES_VERSION[section.name[13:]])
+        if section.name.startswith('dependencies.'):
+            real = section.get('package', None)
+            if real is None:
+                real = section.name[13:]
+            if find_crate(real):
+                section.remove("path")
+                section.remove("git")
+                section.set('version', CRATES_VERSION[real])
         elif section.name == 'dependencies':
             for entry in section.entries:
-                if find_crate(entry['key']):
-                    info = entry['value'].strip()
+                info = entry['value'].strip()
+                crate_name = get_crate_in_package(info)
+                if crate_name is None:
+                    crate_name = get_crate(entry['key'])
+                if crate_name is not None:
                     if info.strip().startswith('{'):
                         parts = [y.strip() for y in info[1:-1].split('",')]
                         parts = [y for y in parts
@@ -489,7 +510,8 @@ def publish_crates(args, temp_dir):
         crate = crate['crate']
         if args.specified_crate is not None and crate['crate'] != args.specified_crate:
             continue
-        publish_crate(crate["repository"], crate["path"], temp_dir, crate['crate'])
+        if not crate.get('ignore', False):
+            publish_crate(crate["repository"], crate["path"], temp_dir, crate['crate'])
     write_msg('Done!')
 
 
