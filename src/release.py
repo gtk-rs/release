@@ -265,7 +265,7 @@ def write_merged_prs(merged_prs, contributors, repo_url):
 
 
 def build_blog_post(repositories, temp_dir, token, args):
-    # pylint: disable=too-many-locals
+    # pylint: disable=too-many-locals,too-many-statements
     write_msg('=> Building blog post...')
 
     content = '''---
@@ -353,6 +353,10 @@ For the interested ones, here is the list of the merged pull requests:
             write_msg('New blog post written into "{}".'.format(file_name))
         add_to_commit(consts.BLOG_REPO, temp_dir, [file_name])
         commit(consts.BLOG_REPO, temp_dir, "Add new blog post")
+        if not args.no_push:
+            branch_name = "release-{}".format(time.strftime("%Y-%m-%d"))
+            push(consts.BLOG_REPO, temp_dir, branch_name)
+            create_pull_request(consts.BLOG_REPO, branch_name, "master", token)
     except Exception as err:
         write_error('build_blog_post failed: {}'.format(err))
         write_msg('\n=> Here is the blog post content:\n{}\n<='.format(content))
