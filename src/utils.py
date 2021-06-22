@@ -80,6 +80,9 @@ def clone_repo(repo_name, temp_dir, depth=None):
                 stdout,
                 stderr))
             return False
+        command = ['bash', '-c', 'cd {} && git submodule update --init'.format(target_dir)]
+        if not exec_command_and_print_error(command):
+            input('Failed to init submodule... Press ENTER to continue')
         return True
     except subprocess.TimeoutExpired:
         write_error('command timed out: {}'.format(' '.join(command)))
