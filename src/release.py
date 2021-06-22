@@ -208,7 +208,7 @@ def update_crate_cargo_file(repo_name, crate_dir_path, temp_dir):
                                         not y.startswith("git=") and
                                         not y.startswith("path ") and
                                         not y.startswith("path="))]
-                        parts.insert(0, 'version = {}'.format(CRATES_VERSION[entry['key']]))
+                        parts.insert(0, 'version = {}'.format(CRATES_VERSION[crate_name]))
                         if len(parts) > 1:
                             entry['value'] = '{{{}}}'.format(', '.join(parts))
                         else:
