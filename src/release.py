@@ -192,7 +192,7 @@ def update_crate_cargo_file(repo_name, crate_dir_path, temp_dir):
                         if not skip_version:
                             parts.insert(0, 'version = {}'.format(CRATES_VERSION[entry['key']]))
                         if len(parts) > 1 or skip_version:
-                            entry['value'] = '"{{{}}}'.format(', '.join(parts))
+                            entry['value'] = '{{{}}}'.format(', '.join(parts))
                         else:
                             entry['value'] = CRATES_VERSION[entry['key']]
                     else:
