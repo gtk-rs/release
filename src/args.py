@@ -99,7 +99,6 @@ class Arguments:
         self.mode = None
         self.no_push = False
         self.specified_crate = None
-        self.badges_only = False
         self.tags_only = False
         self.blog_only = False
         self.crates = consts.CRATE_LIST
@@ -135,8 +134,6 @@ class Arguments:
                     return None
             elif opt == "--no-push":
                 instance.no_push = True
-            elif opt == "--badges-only":
-                instance.badges_only = True
             elif opt in ('-c', '--crate'):
                 instance.specified_crate = arg
             elif opt == '--tags-only':
@@ -156,8 +153,7 @@ class Arguments:
             write_error('Missing token argument.')
             return None
         # To make pylint happy.
-        only_checks = (instance.badges_only is False or
-                       instance.tags_only is False or
+        only_checks = (instance.tags_only is False or
                        instance.blog_only is False)
         if (instance.mode is None and
                 only_checks is False and

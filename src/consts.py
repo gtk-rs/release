@@ -4,37 +4,68 @@ GIT_URL = "git@github.com:"
 
 ORGANIZATION = "gtk-rs"
 MASTER_TMP_BRANCH = "master-release-update"
-CRATE_TMP_BRANCH = "crate-release-update"
 
 BLOG_REPO = "gtk-rs.github.io"
 
 CRATE_LIST = [
-    {"crate": "glib-sys",       "repository": "sys",        "path": "glib-sys"},
-    {"crate": "gobject-sys",    "repository": "sys",        "path": "gobject-sys"},
-    {"crate": "gio-sys",        "repository": "sys",        "path": "gio-sys"},
-    {"crate": "pango-sys",      "repository": "sys",        "path": "pango-sys"},
-    {"crate": "gdk-pixbuf-sys", "repository": "sys",        "path": "gdk-pixbuf-sys"},
-    {"crate": "atk-sys",        "repository": "sys",        "path": "atk-sys"},
-    {"crate": "gdkx11-sys",     "repository": "sys",        "path": "gdkx11-sys",
-     "doc_name": "gdk_x11_sys"},
-    {"crate": "glib-macros",    "repository": "glib",       "path": "glib-macros"},
+    # Sys crates
+    {"crate": "glib-sys",         "repository": "gtk-rs-core", "path": "glib/sys"},
+    {"crate": "gobject-sys",      "repository": "gtk-rs-core", "path": "glib/gobject-sys"},
+    {"crate": "graphene-sys",     "repository": "gtk-rs-core", "path": "graphene/sys"},
+    {"crate": "gio-sys",          "repository": "gtk-rs-core", "path": "gio/sys"},
+    {"crate": "pango-sys",        "repository": "gtk-rs-core", "path": "pango/sys"},
+    {"crate": "gdk-pixbuf-sys",   "repository": "gtk-rs-core", "path": "gdk-pixbuf/sys"},
+    {"crate": "atk-sys",          "repository": "gtk-rs-core", "path": "atk/sys"},
+    {"crate": "gdkx11-sys",       "repository": "gtk3-rs",     "path": "gdkx11/sys"},
+    {"crate": "glib-macros",      "repository": "gtk-rs-core", "path": "glib-macros"},
     # glib must be published before cairo-sys (because of macros)
-    {"crate": "glib",           "repository": "glib",       "path": ""},
-    {"crate": "cairo-sys-rs",   "repository": "cairo",      "path": "cairo-sys-rs",
-     "doc_name": "cairo-sys"},
-    {"crate": "gdk-sys",        "repository": "sys",        "path": "gdk-sys"},
-    {"crate": "gtk-sys",        "repository": "sys",        "path": "gtk-sys"},
-    {"crate": "pangocairo-sys", "repository": "sys",        "path": "pangocairo-sys",
-     "doc_name": "pango_cairo_sys"},
-    {"crate": "atk",            "repository": "atk",        "path": ""},
-    {"crate": "gio",            "repository": "gio",        "path": ""},
-    {"crate": "pango",          "repository": "pango",      "path": ""},
-    {"crate": "cairo-rs",       "repository": "cairo",      "path": "",
-     "doc_name": "cairo"},
-    {"crate": "gdk-pixbuf",     "repository": "gdk-pixbuf", "path": ""},
-    {"crate": "gdk",            "repository": "gdk",        "path": ""},
-    {"crate": "gtk",            "repository": "gtk",        "path": ""},
-    {"crate": "gdkx11",         "repository": "gdkx11",     "path": ""},
-    {"crate": "pangocairo",     "repository": "pangocairo", "path": ""},
-    {"crate": "gtk-test",       "repository": "gtk-test",   "path": ""},
+    {"crate": "glib",             "repository": "gtk-rs-core", "path": "glib"},
+    {"crate": "cairo-sys-rs",     "repository": "gtk-rs-core", "path": "cairo/sys"},
+    {"crate": "gdk-sys",          "repository": "gtk3-rs",     "path": "gdk/sys"},
+    {"crate": "gtk-sys",          "repository": "gtk3-rs",     "path": "gtk/sys"},
+    {"crate": "pangocairo-sys",   "repository": "gtk-rs-core", "path": "pangocairo/sys"},
+    {"crate": "gdk4-sys",         "repository": "gtk4-rs",     "path": "gdk4/sys"},
+    {"crate": "gdk4-wayland-sys", "repository": "gtk4-rs",     "path": "gdk4-wayland/sys"},
+    {"crate": "gdk4-x11-sys",     "repository": "gtk4-rs",     "path": "gdk4-x11/sys"},
+    {"crate": "gsk4-sys",         "repository": "gtk4-rs",     "path": "gsk4/sys"},
+    {"crate": "gtk4-sys",         "repository": "gtk4-rs",     "path": "gtk4/sys"},
+
+    # Non-sys crates
+    {"crate": "gtk3-macros",      "repository": "gtk3-rs",     "path": "gtk3-macro"},
+    {"crate": "gtk4-macros",      "repository": "gtk4-rs",     "path": "gtk4-macro"},
+    {"crate": "graphene",         "repository": "gtk-rs-core", "path": "graphene"},
+    {"crate": "atk",              "repository": "gtk3-rs",     "path": "atk"},
+    {"crate": "gio",              "repository": "gtk-rs-core", "path": "gio"},
+    {"crate": "pango",            "repository": "gtk-rs-core", "path": "pango"},
+    {"crate": "cairo-rs",         "repository": "gtk-rs-core", "path": "cairo"},
+    {"crate": "gdk-pixbuf",       "repository": "gtk-rs-core", "path": "gdk-pixbuf"},
+    {"crate": "gdk",              "repository": "gtk3-rs",     "path": "gdk"},
+    {"crate": "gtk",              "repository": "gtk3-rs",     "path": "gtk"},
+    {"crate": "gdkx11",           "repository": "gtk3-rs",     "path": "gdkx11"},
+    {"crate": "pangocairo",       "repository": "gtk-rs-core", "path": "pangocairo"},
+    {"crate": "gdk4",             "repository": "gtk4-rs",     "path": "gdk4"},
+    {"crate": "gdk4-wayland",     "repository": "gtk4-rs",     "path": "gdk4-wayland"},
+    {"crate": "gdk4-x11",         "repository": "gtk4-rs",     "path": "gdk4-x11"},
+    {"crate": "gsk4",             "repository": "gtk4-rs",     "path": "gsk4"},
+    {"crate": "gtk4",             "repository": "gtk4-rs",     "path": "gtk4"},
+    # {"crate": "gtk-test",         "repository": "gtk-test",    "path": ""},
+]
+
+# pylint: disable=fixme
+# FIXME: To be removed once this release is done.
+OLD_REPO = [
+    "glib",
+    "cairo",
+    "gdkx11",
+    "gsk4",
+    "gdk4",
+    "sys",
+    "graphene",
+    "gdk-pixbuf",
+    "gio",
+    "pango",
+    "gtk",
+    "pangocairo",
+    "atk",
+    "gdk",
 ]
