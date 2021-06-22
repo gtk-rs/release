@@ -187,9 +187,10 @@ def update_crate_cargo_file(repo_name, crate_dir_path, temp_dir):
     toml = TomlHandler(content)
     for section in toml.sections:
         if section.name.startswith('dependencies.'):
-            real = section.get('package', None).replace('"', '')
+            real = section.get('package', None)
             if real is None:
                 real = section.name[13:]
+            real = real.replace('"', '')
             if find_crate(real):
                 section.remove("path")
                 section.remove("git")
