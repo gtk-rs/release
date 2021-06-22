@@ -382,7 +382,7 @@ def generate_new_tag(repository, temp_dir, specified_crate, args):
 
 
 def shorter_version(version):
-    return '.'.join(version.split('.')[:2])
+    return '.'.join(version.split('.')[:2]).replace('"', '')
 
 
 def generate_new_branches(repository, temp_dir, specified_crate, args):
