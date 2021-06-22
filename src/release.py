@@ -161,6 +161,7 @@ def update_crates_cargo_file(args, temp_dir):
 
 
 def update_crate_cargo_file(repo_name, crate_dir_path, temp_dir):
+    # pylint: disable=too-many-branches,too-many-locals,too-many-nested-blocks
     file_path = join(join(join(temp_dir, repo_name), crate_dir_path), "Cargo.toml")
     output = file_path.replace(temp_dir, "")
     if output.startswith('/'):
@@ -177,16 +178,25 @@ def update_crate_cargo_file(repo_name, crate_dir_path, temp_dir):
             section.set('version', CRATES_VERSION[section.name[13:]])
         elif section.name == 'dependencies':
             for entry in section.entries:
-                if find_crate(entry):
-                    info = section.get(entry, '')
+                if find_crate(entry['key']):
+                    info = entry['value'].strip()
                     if info.strip().startswith('{'):
                         parts = [y.strip() for y in info[1:-1].split('",')]
                         parts = [y for y in parts
                                  if not y.startswith("git ") and not y.startswith("git=")]
-                        parts.insert(0, 'version = {}'.format(CRATES_VERSION[entry]))
-                        section.set(entry, '"{{{}}}'.format(', '.join(parts)))
+                        skip_version = False
+                        for part in parts:
+                            if part.startswith("path ") or part.startswith("path="):
+                                skip_version = True
+                                break
+                        if not skip_version:
+                            parts.insert(0, 'version = {}'.format(CRATES_VERSION[entry['key']]))
+                        if len(parts) > 1 or skip_version:
+                            entry['value'] = '"{{{}}}'.format(', '.join(parts))
+                        else:
+                            entry['value'] = CRATES_VERSION[entry['key']]
                     else:
-                        section.set(entry, CRATES_VERSION[entry])
+                        entry['value'] = CRATES_VERSION[entry]
     out = str(toml)
     if not out.endswith("\n"):
         out += '\n'
@@ -234,7 +244,7 @@ def update_repo_version(repo_name, crate_name, crate_dir_path, temp_dir, update_
             section.set('version', new_version)
         elif section.name == 'dependencies':
             for entry in section.entries:
-                if find_crate(entry):
+                if find_crate(entry['key']):
                     new_version = check_and_update_version(section.entries[entry],
                                                            update_type,
                                                            entry,
