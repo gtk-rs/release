@@ -183,15 +183,12 @@ def update_crate_cargo_file(repo_name, crate_dir_path, temp_dir):
                     if info.strip().startswith('{'):
                         parts = [y.strip() for y in info[1:-1].split('",')]
                         parts = [y for y in parts
-                                 if not y.startswith("git ") and not y.startswith("git=")]
-                        skip_version = False
-                        for part in parts:
-                            if part.startswith("path ") or part.startswith("path="):
-                                skip_version = True
-                                break
-                        if not skip_version:
-                            parts.insert(0, 'version = {}'.format(CRATES_VERSION[entry['key']]))
-                        if len(parts) > 1 or skip_version:
+                                 if (not y.startswith("git ") and
+                                        not y.startswith("git=") and
+                                        not y.startswith("path ") and
+                                        not y.startswith("path="))]
+                        parts.insert(0, 'version = {}'.format(CRATES_VERSION[entry['key']]))
+                        if len(parts) > 1:
                             entry['value'] = '{{{}}}'.format(', '.join(parts))
                         else:
                             entry['value'] = CRATES_VERSION[entry['key']]
