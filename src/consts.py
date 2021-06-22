@@ -31,8 +31,8 @@ CRATE_LIST = [
     {"crate": "gtk4-sys",         "repository": "gtk4-rs",     "path": "gtk4/sys"},
 
     # Non-sys crates
-    {"crate": "gtk3-macros",      "repository": "gtk3-rs",     "path": "gtk3-macro"},
-    {"crate": "gtk4-macros",      "repository": "gtk4-rs",     "path": "gtk4-macro"},
+    {"crate": "gtk3-macros",      "repository": "gtk3-rs",     "path": "gtk3-macros"},
+    {"crate": "gtk4-macros",      "repository": "gtk4-rs",     "path": "gtk4-macros"},
     {"crate": "graphene",         "repository": "gtk-rs-core", "path": "graphene"},
     {"crate": "atk",              "repository": "gtk3-rs",     "path": "atk"},
     {"crate": "gio",              "repository": "gtk-rs-core", "path": "gio"},
