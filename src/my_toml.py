@@ -26,7 +26,7 @@ class Section:
         self.entries.append({'key': key, 'value': value})
 
     def clear(self):
-        self.entries = {}
+        self.entries = []
 
     def get(self, key, default_value):
         for entry in self.entries:
