@@ -25,8 +25,11 @@ class Section:
                 return
         self.entries.append({'key': key, 'value': value})
 
-    def clear(self):
-        self.entries = []
+    def remove(self, key):
+        for (pos, entry) in enumerate(self.entries):
+            if entry['key'] == key:
+                self.entries.pop(pos)
+                return
 
     def get(self, key, default_value):
         for entry in self.entries:

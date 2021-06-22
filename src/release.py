@@ -172,12 +172,21 @@ def update_crate_cargo_file(repo_name, crate_dir_path, temp_dir):
     toml = TomlHandler(content)
     for section in toml.sections:
         if section.name.startswith('dependencies.') and find_crate(section.name[13:]):
-            section.clear()
+            section.remove("path")
+            section.remove("git")
             section.set('version', CRATES_VERSION[section.name[13:]])
         elif section.name == 'dependencies':
             for entry in section.entries:
                 if find_crate(entry):
-                    section.set(entry, CRATES_VERSION[entry])
+                    info = section.get(entry, '')
+                    if info.strip().startswith('{'):
+                        parts = [y.strip() for y in info[1:-1].split('",')]
+                        parts = [y for y in parts
+                                 if not y.startswith("git ") and not y.startswith("git=")]
+                        parts.insert(0, 'version = {}'.format(CRATES_VERSION[entry]))
+                        section.set(entry, '"{{{}}}'.format(', '.join(parts)))
+                    else:
+                        section.set(entry, CRATES_VERSION[entry])
     out = str(toml)
     if not out.endswith("\n"):
         out += '\n'
@@ -467,6 +476,7 @@ def publish_crates(args, temp_dir):
     write_msg('++ IMPORTANT ++')
     write_msg('+++++++++++++++')
     write_msg('Almost everything has been done.')
+    input('Check the generated branches then press ENTER to continue...')
     write_msg('=> Publishing crates...')
     for crate in args.crates:
         crate = crate['crate']
