@@ -178,7 +178,6 @@ def update_crate_cargo_file(path, temp_dir):
                 real = section.name[13:]
             real = real.replace('"', '')
             if find_crate(real):
-                section.remove("path")
                 section.remove("git")
                 section.set('version', CRATES_VERSION[real])
         elif section.name == 'dependencies':
@@ -191,10 +190,7 @@ def update_crate_cargo_file(path, temp_dir):
                     if info.strip().startswith('{'):
                         parts = [y.strip() for y in info[1:-1].split(',')]
                         parts = [y for y in parts
-                                 if (not y.startswith("git ") and
-                                        not y.startswith("git=") and
-                                        not y.startswith("path ") and
-                                        not y.startswith("path="))]
+                                 if not y.startswith("git ") and not y.startswith("git=")]
                         parts.append('version = {}'.format(CRATES_VERSION[crate_name]))
                         if len(parts) > 1:
                             entry['value'] = '{{{}}}'.format(', '.join(parts))
