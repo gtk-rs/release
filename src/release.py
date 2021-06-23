@@ -9,7 +9,8 @@ import shutil
 import sys
 import tempfile
 from os import sep as os_sep
-from os.path import join
+from os import listdir
+from os.path import isdir, join
 
 # local imports
 import consts
@@ -116,10 +117,26 @@ def get_crate_version(repo_name, crate_name, crate_dir_path, temp_dir):
     return False
 
 
+def update_examples(path, temp_dir):
+    for entry in listdir(path):
+        if entry == "Cargo.toml":
+            update_crate_cargo_file(path, temp_dir)
+            continue
+        full_path = join(path, entry)
+        if isdir(full_path):
+            update_examples(full_path, temp_dir)
+
+
 def update_crates_cargo_file(args, temp_dir):
+    write_msg('==> Updating versions in crates...')
     for crate in args.crates:
         crate = crate['crate']
-        update_crate_cargo_file(crate["repository"], crate["path"], temp_dir)
+        update_crate_cargo_file(join(join(temp_dir, crate["repository"]), crate["path"]), temp_dir)
+    write_msg('Done!')
+    write_msg('==> Now updating versions in examples...')
+    for example in consts.EXAMPLES:
+        update_examples(join(join(temp_dir, example['repository']), example['path']), temp_dir)
+    write_msg('Done!')
 
 
 def get_crate(crate_name):
@@ -143,9 +160,9 @@ def get_crate_in_package(value):
     return None
 
 
-def update_crate_cargo_file(repo_name, crate_dir_path, temp_dir):
+def update_crate_cargo_file(path, temp_dir):
     # pylint: disable=too-many-branches,too-many-locals,too-many-nested-blocks
-    file_path = join(join(join(temp_dir, repo_name), crate_dir_path), "Cargo.toml")
+    file_path = join(path, "Cargo.toml")
     output = file_path.replace(temp_dir, "")
     if output.startswith('/'):
         output = output[1:]
