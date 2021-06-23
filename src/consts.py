@@ -50,3 +50,8 @@ CRATE_LIST = [
     {"crate": "gtk4",             "repository": "gtk4-rs",     "path": "gtk4"},
     # {"crate": "gtk-test",         "repository": "gtk-test",    "path": ""},
 ]
+
+EXAMPLES = [
+    {"repository": "gtk3-rs", "path": "examples"},
+    {"repository": "gtk4-rs", "path": "examples"},
+]
