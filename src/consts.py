@@ -50,22 +50,3 @@ CRATE_LIST = [
     {"crate": "gtk4",             "repository": "gtk4-rs",     "path": "gtk4"},
     # {"crate": "gtk-test",         "repository": "gtk-test",    "path": ""},
 ]
-
-# pylint: disable=fixme
-# FIXME: To be removed once this release is done.
-OLD_REPO = [
-    "glib",
-    "cairo",
-    "gdkx11",
-    "gsk4",
-    "gdk4",
-    "sys",
-    "graphene",
-    "gdk-pixbuf",
-    "gio",
-    "pango",
-    "gtk",
-    "pangocairo",
-    "atk",
-    "gdk",
-]
