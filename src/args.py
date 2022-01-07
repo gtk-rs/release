@@ -164,7 +164,7 @@ class Arguments:
         default_updates = {"sys": None, "non-sys": None}
         if len(instance.crates) == 0:
             for crate in consts.CRATE_LIST:
-                if get_answer('Do you want to include "{}" in this release?') is True:
+                if get_answer(f'Do you want to include "{crate}" in this release?') is True:
                     instance.crates.append(
                         {
                             'up-type': get_up_type(crate['crate'],
