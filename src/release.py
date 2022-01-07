@@ -231,6 +231,35 @@ def write_merged_prs(merged_prs, contributors, repo_url):
     return content + '\n'
 
 
+def downgrade_version(version):
+    parts = version.split(".")
+    while len(parts) < 3:
+        parts.append('0')
+    for pos, part in enumerate(parts):
+        tmp = int(part)
+        if tmp > 0:
+            tmp -= 1
+            parts[pos] = str(tmp)
+            break
+    return '.'.join(parts)
+
+
+def checkout_to_last_release_branch(repo_name, temp_dir):
+    for crate in consts.CRATE_LIST:
+        if not crate['name'].endswith('-sys') and crate['repository'] == repo_name:
+            original_version = CRATES_VERSION[crate['name']]
+            version = downgrade_version(original_version)
+            # The version branches only have the two first digits.
+            version = '.'.join(version.split('.')[:2])
+            write_msg(
+                f'For repository `{repo_name}`, the previous release branch was guessed as '
+                f'`{version}`, (from `{original_version}`) let\'s try to checkout to it...')
+            if not checkout_target_branch(repo_name, temp_dir, version, ask_input=False):
+                input("Failed to checkout to this branch... Press ENTER to continue")
+            return
+    write_error(f'No crate matches the repository `{repo_name}` apparently...')
+
+
 def build_blog_post(repositories, temp_dir, token, args):
     # pylint: disable=too-many-locals,too-many-statements
     write_msg('=> Building blog post...')
@@ -258,6 +287,7 @@ For the interested ones, here is the list of the merged pull requests:
     oldest_date = None
 
     for repo in repositories:
+        checkout_to_last_release_branch(repo, temp_dir)
         success, out, err = get_last_commit_date(repo, temp_dir)
         if not success:
             write_msg(f"Couldn't get PRs for '{repo}': {err}")

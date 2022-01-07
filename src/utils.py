@@ -241,11 +241,14 @@ def revert_changes(repo_name, temp_dir, files):
         input("Fix the error and then press ENTER")
 
 
-def checkout_target_branch(repo_name, temp_dir, target_branch):
+def checkout_target_branch(repo_name, temp_dir, target_branch, ask_input=True):
     repo_path = join(temp_dir, repo_name)
     command = ['bash', '-c', f'cd {repo_path} && git checkout {target_branch}']
     if not exec_command_and_print_error(command):
-        input("Fix the error and then press ENTER")
+        if ask_input:
+            input("Fix the error and then press ENTER")
+        return False
+    return True
 
 
 def checkout_to_new_branch(repo_name, temp_dir, target_branch):
@@ -290,7 +293,6 @@ def publish_crate(repository, crate_dir_path, temp_dir, crate_name):
     # pylint: disable=too-many-locals
     write_msg(f'=> publishing crate {crate_name}')
     path = join(join(temp_dir, repository), crate_dir_path)
-    # In case we needed to fix bugs, we checkout to crate branch before publishing crate.
     command = [
         'bash',
         '-c',
