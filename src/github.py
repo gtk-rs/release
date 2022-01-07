@@ -197,8 +197,8 @@ class Repository:
             f'https://api.github.com/repos/{self.owner}/{self.name}/commits',
             token=self.gh_obj.token,
             params={'sha': branch,
-                    'since': f'{since.year}-{since.month:01d}-{since.day:01d}T00:00:00Z',
-                    'until': f'{until.year}-{until.month:01d}-{until.day:01d}T00:00:00Z'})
+                    'since': f'{since.year}-{since.month:02d}-{since.day:02d}T00:00:00Z',
+                    'until': f'{until.year}-{until.month:02d}-{until.day:02d}T00:00:00Z'})
         if commits is None:
             return []
         return [Commit(x['commit']['author']['name'], x['commit']['committer']['name'],
