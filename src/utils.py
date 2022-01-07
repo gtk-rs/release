@@ -12,11 +12,11 @@ from my_toml import TomlHandler
 
 
 def write_error(error_msg):
-    sys.stderr.write('{}\n'.format(error_msg))
+    sys.stderr.write(f'{error_msg}\n')
 
 
 def write_msg(msg):
-    sys.stdout.write('{}\n'.format(msg))
+    sys.stdout.write(f'{msg}\n')
 
 
 def convert_to_string(content):
@@ -27,20 +27,20 @@ def convert_to_string(content):
 
 def get_file_content(file_path):
     try:
-        with open(file_path, 'r') as file:
+        with open(file_path, 'r', encoding='utf-8') as file:
             return file.read()
     except Exception as err:
-        write_error('get_file_content failed: "{}": {}'.format(file_path, err))
+        write_error(f'get_file_content failed: "{file_path}": {err}')
     return None
 
 
 def write_into_file(file_path, content):
     try:
-        with open(file_path, 'w') as file:
+        with open(file_path, 'w', encoding='utf-8') as file:
             file.write(content)
             return True
     except Exception as err:
-        write_error('write_into_file failed: "{}": {}'.format(file_path, err))
+        write_error(f'write_into_file failed: "{file_path}": {err}')
     return False
 
 
@@ -57,37 +57,39 @@ def exec_command(command, timeout=None):
 def exec_command_and_print_error(command, timeout=None):
     ret, stdout, stderr = exec_command(command, timeout=timeout)
     if not ret:
-        write_error('Command "{}" failed:'.format(' '.join(command)))
+        full_command = ' '.join(command)
+        write_error(f'Command "{full_command}" failed:')
         if len(stdout) > 0:
-            write_error('=== STDOUT ===\n{}\n'.format(stdout))
+            write_error(f'=== STDOUT ===\n{stdout}\n')
         if len(stderr) > 0:
-            write_error('=== STDERR ===\n{}\n'.format(stderr))
+            write_error(f'=== STDERR ===\n{stderr}\n')
     return ret
 
 
 def clone_repo(repo_name, temp_dir, depth=None):
-    repo_url = '{}/{}/{}.git'.format(consts.GIT_URL, consts.ORGANIZATION, repo_name)
+    repo_url = f'{consts.GIT_URL}/{consts.ORGANIZATION}/{repo_name}.git'
     target_dir = join(temp_dir, repo_name)
     try:
-        write_msg('=> Cloning "{}" from "{}"'.format(repo_name, repo_url))
+        write_msg(f'=> Cloning "{repo_name}" from "{repo_url}"')
         command = ['git', 'clone', repo_url, target_dir]
         if depth is not None:
-            command = ['git', 'clone', '--depth', '{}'.format(depth), repo_url, target_dir]
+            command = ['git', 'clone', '--depth', str(depth), repo_url, target_dir]
         ret, stdout, stderr = exec_command(command, timeout=300)
         if not ret:
-            write_error('command "{}" failed: ===STDOUT===\n{}\n===STDERR===\n{}'.format(
-                ' '.join(command),
-                stdout,
-                stderr))
+            full_command = ' '.join(command)
+            write_error(
+                f'command "{full_command}" failed: ===STDOUT===\n{stdout}\n===STDERR===\n{stderr}')
             return False
-        command = ['bash', '-c', 'cd {} && git submodule update --init'.format(target_dir)]
+        command = ['bash', '-c', f'cd {target_dir} && git submodule update --init']
         if not exec_command_and_print_error(command):
             input('Failed to init submodule... Press ENTER to continue')
         return True
     except subprocess.TimeoutExpired:
-        write_error('command timed out: {}'.format(' '.join(command)))
+        full_command = ' '.join(command)
+        write_error(f'command timed out: {full_command}')
     except Exception as err:
-        write_error('command "{}" got an exception: {}'.format(' '.join(command), err))
+        full_command = ' '.join(command)
+        write_error(f'command "{full_command}" got an exception: {err}')
     return False
 
 
@@ -98,7 +100,7 @@ def create_headers(token):
     }
     if token is not None:
         # Authentication to github.
-        headers['Authorization'] = 'token {}'.format(token)
+        headers['Authorization'] = f'token {token}'
     return headers
 
 
@@ -117,11 +119,11 @@ def post_content(url, token, details, method='post', header_extras=None):
         try:
             req.raise_for_status()
         except Exception:
-            write_msg('Sent by bithub api: {}'.format(req.json()))
+            write_msg(f'Sent by bithub api: {req.json()}')
             req.raise_for_status()
         return req.json()
     except Exception as err:
-        write_error('post_content: An error occurred: {}'.format(err))
+        write_error(f'post_content: An error occurred: {err}')
     return None
 
 
@@ -139,8 +141,8 @@ def get_highest_feature_version(v1_feature, v2_feature):
                 return v2_feature
             i += 1
         except Exception:
-            write_error('get_highest_feature_version int conversion error: int("{}") vs int("{}")'
-                        ' from "{}" and "{}"'.format(t_v1[i], t_v2[i], v1_feature, v2_feature))
+            write_error(f'get_highest_feature_version int conversion error: int("{t_v1[i]}") vs '
+                        f'int("{t_v2[i]}") from "{v1_feature}" and "{v2_feature}"')
             break
     return v1_feature
 
@@ -211,92 +213,88 @@ def commit_and_push(repo_name, temp_dir, commit_msg, target_branch):
 
 def commit(repo_name, temp_dir, commit_msg):
     repo_path = join(temp_dir, repo_name)
-    command = ['bash', '-c', 'cd {} && git commit . -m "{}"'.format(repo_path, commit_msg)]
+    command = ['bash', '-c', f'cd {repo_path} && git commit . -m "{commit_msg}"']
     if not exec_command_and_print_error(command):
         input("Fix the error and then press ENTER")
 
 
 def push(repo_name, temp_dir, target_branch):
     repo_path = join(temp_dir, repo_name)
-    command = ['bash', '-c', 'cd {} && git push origin HEAD:{}'.format(repo_path, target_branch)]
+    command = ['bash', '-c', f'cd {repo_path} && git push origin HEAD:{target_branch}']
     if not exec_command_and_print_error(command):
         input("Fix the error and then press ENTER")
 
 
 def add_to_commit(repo_name, temp_dir, files_to_add):
     repo_path = join(temp_dir, repo_name)
-    command = ['bash', '-c', 'cd {} && git add {}'
-               .format(repo_path, ' '.join(['"{}"'.format(f) for f in files_to_add]))]
+    files = ' '.join([f'"{f}"' for f in files_to_add])
+    command = ['bash', '-c', f'cd {repo_path} && git add {files}']
     if not exec_command_and_print_error(command):
         input("Fix the error and then press ENTER")
 
 
 def revert_changes(repo_name, temp_dir, files):
     repo_path = join(temp_dir, repo_name)
-    command = ['bash', '-c',
-               'cd {0} && git rm -f {1} && git checkout -- {1}'.format(
-                   repo_path,
-                   ' '.join(['"{}"'.format(f) for f in files]))]
+    files = ' '.join([f'"{f}"' for f in files])
+    command = ['bash', '-c', f'cd {repo_path} && git rm -f {files} && git checkout -- {files}']
     if not exec_command_and_print_error(command):
         input("Fix the error and then press ENTER")
 
 
 def checkout_target_branch(repo_name, temp_dir, target_branch):
     repo_path = join(temp_dir, repo_name)
-    command = ['bash', '-c', 'cd {} && git checkout {}'.format(repo_path, target_branch)]
+    command = ['bash', '-c', f'cd {repo_path} && git checkout {target_branch}']
     if not exec_command_and_print_error(command):
         input("Fix the error and then press ENTER")
 
 
 def checkout_to_new_branch(repo_name, temp_dir, target_branch):
     repo_path = join(temp_dir, repo_name)
-    command = ['bash', '-c', 'cd {} && git checkout -b {}'.format(repo_path, target_branch)]
+    command = ['bash', '-c', f'cd {repo_path} && git checkout -b {target_branch}']
     if not exec_command_and_print_error(command):
         input("Fix the error and then press ENTER")
 
 
 def get_last_commit_date(repo_name, temp_dir):
     repo_path = join(temp_dir, repo_name)
-    success, out, err = exec_command(['bash', '-c',
-                                      'cd {} && git log --format=%at --no-merges -n 1'.format(
-                                          repo_path)
-                                     ])
+    success, out, err = exec_command(
+        ['bash', '-c', f'cd {repo_path} && git log --format=%at --no-merges -n 1'])
     return (success, out, err)
 
 
 def get_last_commit_hash(repo_path):
-    success, out, _ = exec_command(['bash', '-c',
-                                    'cd {} && git rev-parse HEAD'.format(repo_path)
-                                   ])
+    success, out, _ = exec_command(
+        ['bash', '-c', f'cd {repo_path} && git rev-parse HEAD'])
     if success is True:
         return out.strip()
     return ''
 
 
 def get_repo_last_commit_hash(repo_url):
-    success, out, _ = exec_command(['bash', '-c',
-                                    'git ls-remote {} HEAD'.format(repo_url)
-                                   ])
+    success, out, _ = exec_command(
+        ['bash', '-c', f'git ls-remote {repo_url} HEAD'])
     if success is True:
-        return out.split('\n')[0].strip().split('\t')[0].split(' ')[0]
+        out = out.split('\n', maxsplit=1)[0].strip()
+        return out.split('\t', maxsplit=1)[0].split(' ', maxsplit=1)[0]
     return '<unknown>'
 
 
 def merging_branches(repo_name, temp_dir, merge_branch):
     repo_path = join(temp_dir, repo_name)
-    command = ['bash', '-c', 'cd {} && git merge "origin/{}"'.format(repo_path, merge_branch)]
+    command = ['bash', '-c', f'cd {repo_path} && git merge "origin/{merge_branch}"']
     if not exec_command_and_print_error(command):
         input("Fix the error and then press ENTER")
 
 
 def publish_crate(repository, crate_dir_path, temp_dir, crate_name):
-    write_msg('=> publishing crate {}'.format(crate_name))
+    # pylint: disable=too-many-locals
+    write_msg(f'=> publishing crate {crate_name}')
     path = join(join(temp_dir, repository), crate_dir_path)
     # In case we needed to fix bugs, we checkout to crate branch before publishing crate.
     command = [
         'bash',
         '-c',
-        'cd {} && cargo publish --no-verify'.format(path)]
+        f'cd {path} && cargo publish --no-verify']
     retry = 3
     error_messages = []
     final_success = False
@@ -304,60 +302,56 @@ def publish_crate(repository, crate_dir_path, temp_dir, crate_name):
     while retry > 0:
         ret, stdout, stderr = exec_command(command)
         if not ret:
-            error_messages.append('Command "{}" failed:'.format(' '.join(command)))
+            full_command = ' '.join(command)
+            error_messages.append(f'Command "{full_command}" failed:')
             if len(stdout) > 0:
-                error_messages[len(error_messages) - 1] += '\n=== STDOUT ===\n{}\n'.format(stdout)
+                error_messages[len(error_messages) - 1] += f'\n=== STDOUT ===\n{stdout}\n'
             if len(stderr) > 0:
-                error_messages[len(error_messages) - 1] += '\n=== STDERR ===\n{}\n'.format(stderr)
+                error_messages[len(error_messages) - 1] += f'\n=== STDERR ===\n{stderr}\n'
             retry -= 1
             if retry > 0:
-                write_msg("Let's sleep for {} seconds before retrying, {} retr{} remaining..."
-                          .format(wait_time, retry + 1, 'ies' if retry > 0 else 'y'))
+                extra = 'ies' if retry > 0 else 'y'
+                write_msg(
+                    f"Let's sleep for {wait_time} seconds before retrying, {retry + 1} "
+                    f"retr{extra} remaining...")
                 time.sleep(wait_time)
         else:
             final_success = True
             break
     if final_success is False:
         errors = set(error_messages)
-        write_msg('== ERRORS ==\n{}'.format('====\n'.join(errors)))
+        errors = '====\n'.join(errors)
+        write_msg(f'== ERRORS ==\n{errors}')
         input("Something bad happened! Try to fix it and then press ENTER to continue...")
-    write_msg('> crate {} has been published'.format(crate_name))
+    write_msg(f'> crate {crate_name} has been published')
 
 
 def create_tag_and_push(tag_name, repository, temp_dir):
     path = join(temp_dir, repository)
-    command = ['bash', '-c', 'cd {0} && git tag "{1}" && git push origin "{1}"'
-               .format(path, tag_name)]
+    command = ['bash', '-c', f'cd {path} && git tag "{tag_name}" && git push origin "{tag_name}"']
     if not exec_command_and_print_error(command):
         input("Something bad happened! Try to fix it and then press ENTER to continue...")
 
 
 def create_pull_request(repo_name, from_branch, target_branch, token, add_to_list=True):
-    req = post_content('{}/repos/{}/{}/pulls'.format(consts.GH_API_URL, consts.ORGANIZATION,
-                                                     repo_name),
+    req = post_content(f'{consts.GH_API_URL}/repos/{consts.ORGANIZATION}/{repo_name}/pulls',
                        token,
-                       {'title': '[release] merging {} into {}'.format(from_branch, target_branch),
+                       {'title': f'[release] merging {from_branch} into {target_branch}',
                         'body': 'cc @GuillaumeGomez @sdroege @bilelmoussaoui',
                         'base': target_branch,
                         'head': from_branch,
                         'maintainer_can_modify': True})
     if req is None:
-        write_error("Pull request from {repo}/{from_b} to {repo}/{target} couldn't be created. You "
-                    "need to do it yourself... (url provided at the end)"
-                    .format(repo=repo_name,
-                            from_b=from_branch,
-                            target=target_branch))
+        write_error(f"Pull request from {repo_name}/{from_branch} to {repo_name}/{target_branch} "
+                    "couldn't be created. You need to do it yourself... (url provided at the end)")
         input("Press ENTER once done to continue...")
-        PULL_REQUESTS.append('|=> "{}/{}/{}/compare/{}...{}?expand=1"'
-                             .format(consts.GITHUB_URL,
-                                     consts.ORGANIZATION,
-                                     repo_name,
-                                     target_branch,
-                                     from_branch))
+        PULL_REQUESTS.append(
+            f'|=> "{consts.GITHUB_URL}/{consts.ORGANIZATION}/{repo_name}'
+            f'/compare/{target_branch}...{from_branch}?expand=1"')
     else:
-        write_msg("===> Pull request created: {}".format(req['html_url']))
+        write_msg(f"===> Pull request created: {req['html_url']}")
         if add_to_list is True:
-            PULL_REQUESTS.append('> {}'.format(req['html_url']))
+            PULL_REQUESTS.append(f'> {req["html_url"]}')
 
 
 def check_if_up_to_date():
@@ -365,8 +359,9 @@ def check_if_up_to_date():
     last_commit = get_last_commit_hash(".")
     remote_last_commit = get_repo_last_commit_hash(remote_repo)
     if last_commit != remote_last_commit:
-        write_msg("Remote repository `{}` has a different last commit than local: `{}` != `{}`"
-                  .format(remote_repo, remote_last_commit, last_commit))
+        write_msg(
+            f"Remote repository `{remote_repo}` has a different last commit than local: `"
+            f"{remote_last_commit}` != `{last_commit}`")
         text = input("Do you want to continue anyway? [y/N] ").strip().lower()
         if len(text) == 0 or text != 'y':
             write_msg("Ok, leaving then. Don't forget to update!")

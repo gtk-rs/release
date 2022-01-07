@@ -33,12 +33,12 @@ class UpdateType:
 
 def get_answer(text):
     while True:
-        text = input('{} [Y/n] '.format(text)).strip().lower()
+        text = input(f'{text} [Y/n] ').strip().lower()
         if len(text) == 0 or text == 'y':
             return True
         if text == 'n':
             return False
-        write_msg('-> Invalid answer "{}": only "Y" and "n" are expected'.format(text))
+        write_msg(f'-> Invalid answer "{text}": only "Y" and "n" are expected')
 
 
 def is_sys_crate(crate):
@@ -53,8 +53,7 @@ def get_up_type(crate, mode, pick_update_type_for_crates, default_updates):
     if not is_sys_crate(crate) and default_updates['non-sys'] is not None:
         return default_updates['non-sys']
     while pick_update_type_for_crates is True:
-        text = input('Which kind of update do you want for "{}"? [MINOR/MEDIUM/MAJOR] '
-                     .format(crate))
+        text = input(f'Which kind of update do you want for "{crate}"? [MINOR/MEDIUM/MAJOR] ')
         text = text.strip().lower()
         mode = UpdateType.create_from_string(text)
         if mode is not None:
@@ -65,15 +64,16 @@ def get_up_type(crate, mode, pick_update_type_for_crates, default_updates):
                   get_answer('Do you want to use this release for all other non-sys crates?')):
                 default_updates['non-sys'] = mode
             break
-        write_msg('Invalid update type received: "{}". Accepted values: (MINOR|MEDIUM|MAJOR)'
-                  .format(text))
+        write_msg(f'Invalid update type received: "{text}". Accepted values: (MINOR|MEDIUM|MAJOR)')
     return mode
 
 
 def ask_updates_confirmation(crates):
     write_msg("Recap' of picked updates:")
     for crate in crates:
-        write_msg("[{}] => {}".format(crate['crate']['crate'], UpdateType.to_str(crate['up-type'])))
+        crate_name = crate['crate']['crate']
+        update = UpdateType.to_str(crate['up-type'])
+        write_msg(f"[{crate_name}] => {update}")
     return get_answer('Do you agree with this?')
 
 
@@ -129,8 +129,8 @@ class Arguments:
             elif opt in ("-m", "--mode"):
                 instance.mode = UpdateType.create_from_string(arg)
                 if instance.mode is None:
-                    write_error('{}: Invalid update type received. Accepted values: '
-                                '(MINOR|MEDIUM|MAJOR)'.format(opt))
+                    write_error(f'{opt}: Invalid update type received. Accepted values: '
+                                '(MINOR|MEDIUM|MAJOR)')
                     return None
             elif opt == "--no-push":
                 instance.no_push = True
@@ -145,7 +145,7 @@ class Arguments:
             elif opt == '--pick-update-type-for-crates':
                 pick_update_type_for_crates = True
             else:
-                write_msg('"{}": unknown option'.format(opt))
+                write_msg(f'"{opt}": unknown option')
                 write_msg('Use "-h" or "--help" to see help')
                 return None
         if instance.token is None and instance.no_push is False and instance.blog_only is False:

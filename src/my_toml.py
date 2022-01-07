@@ -38,9 +38,8 @@ class Section:
         return default_value
 
     def __str__(self):
-        return '[{}]\n{}'.format(self.name,
-                                 '\n'.join(['{} = {}'.format(x['key'], x['value'])
-                                            for x in self.entries]))
+        content = '\n'.join([f'{x["key"]} = {x["value"]}' for x in self.entries])
+        return f'[{self.name}]\n{content}'
 
 
 class TomlHandler:
