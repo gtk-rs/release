@@ -65,15 +65,15 @@ def get_url_data(url, headers, params):
             if ('X-RateLimit-Limit' in res.headers and
                     'X-RateLimit-Remaining' in res.headers and
                     'X-RateLimit-Reset' in res.headers):
+                limit = res.headers['X-RateLimit-Limit']
+                remaining = res.headers['X-RateLimit-Remaining']
+                reset = res.headers['X-RateLimit-Reset']
                 raise Exception("Github rate limit exceeded...\n"
-                                "X-RateLimit-Limit: {}\n"
-                                "X-RateLimit-Remaining: {}\n"
-                                "X-RateLimit-Reset: {}".format(res.headers['X-RateLimit-Limit'],
-                                                               res.headers['X-RateLimit-Remaining'],
-                                                               res.headers['X-RateLimit-Reset']))
-        raise Exception("Get request failed: '{}', got: [{}]: {}".format(url,
-                                                                         res.status_code,
-                                                                         str(res.content)))
+                                f"X-RateLimit-Limit: {limit}\n"
+                                f"X-RateLimit-Remaining: {remaining}\n"
+                                f"X-RateLimit-Reset: {reset}")
+        raise Exception(
+            f"Get request failed: '{url}', got: [{res.status_code}]: {str(res.content)}")
     return res
 
 
@@ -94,7 +94,7 @@ def get_all_contents(url, state=None, max_date=None, token=None, recursive=True,
         params['direction'] = 'desc'
     if token is not None:
         # Authentication to github.
-        headers['Authorization'] = 'token {}'.format(token)
+        headers['Authorization'] = f'token {token}'
     res = get_url_data(url, headers, params)
     content = res.json()
     to_return = []
@@ -117,11 +117,10 @@ def get_all_contents(url, state=None, max_date=None, token=None, recursive=True,
         return to_return
     next_page = get_page_number(next_page_url)
     last_page = get_page_number(last_page_url)
-    to_replace = "page={}".format(next_page)
+    to_replace = f"page={next_page}"
 
     while next_page <= last_page:
-        res = get_url_data(next_page_url.replace("&{}".format(to_replace),
-                                                 "&page={}".format(next_page)),
+        res = get_url_data(next_page_url.replace(f"&{to_replace}", f"&page={next_page}"),
                            headers,
                            None)
         if res.status_code != 200:
@@ -161,7 +160,7 @@ class Organization:
         self.name = name
 
     def get_repositories(self):
-        repos = get_all_contents('https://api.github.com/orgs/{}/repos'.format(self.name),
+        repos = get_all_contents(f'https://api.github.com/orgs/{self.name}/repos',
                                  token=self.gh_obj.token)
         if repos is None:
             return []
@@ -176,8 +175,7 @@ class Repository:
         self.owner = owner
 
     def get_pulls(self, state, max_date, only_merged=False):
-        prs = get_all_contents('https://api.github.com/repos/{}/{}/pulls'.format(self.owner,
-                                                                                 self.name),
+        prs = get_all_contents(f'https://api.github.com/repos/{self.owner}/{self.name}/pulls',
                                state, max_date,
                                token=self.gh_obj.token)
         if prs is None:
@@ -188,8 +186,7 @@ class Repository:
 
     def get_pull(self, pull_number):
         pull_request = get_all_contents(
-            'https://api.github.com/repos/{}/{}/pulls/{}'.format(
-                self.owner, self.name, pull_number),
+            f'https://api.github.com/repos/{self.owner}/{self.name}/pulls/{pull_number}',
             'all', None,
             token=self.gh_obj.token,
         )
@@ -197,13 +194,11 @@ class Repository:
 
     def get_commits(self, branch, since, until):
         commits = get_all_contents(
-            'https://api.github.com/repos/{}/{}/commits'.format(self.owner, self.name),
+            f'https://api.github.com/repos/{self.owner}/{self.name}/commits',
             token=self.gh_obj.token,
             params={'sha': branch,
-                    'since': '{}-{:01d}-{:01d}T00:00:00Z'.format(since.year, since.month,
-                                                                 since.day),
-                    'until': '{}-{:01d}-{:01d}T00:00:00Z'.format(until.year, until.month,
-                                                                 until.day)})
+                    'since': f'{since.year}-{since.month:02d}-{since.day:02d}T00:00:00Z',
+                    'until': f'{until.year}-{until.month:02d}-{until.day:02d}T00:00:00Z'})
         if commits is None:
             return []
         return [Commit(x['commit']['author']['name'], x['commit']['committer']['name'],
@@ -261,6 +256,4 @@ class PullRequest:
             self.closed_at = ''
 
     def get_url(self):
-        return ("https://github.com/{}/{}/pull/{}".format(self.repo_owner,
-                                                          self.repo_name,
-                                                          self.number))
+        return f"https://github.com/{self.repo_owner}/{self.repo_name}/pull/{self.number}"

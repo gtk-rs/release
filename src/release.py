@@ -44,7 +44,7 @@ def update_version(version, update_type, section_name, place_type="section"):
     version_split = version.replace('"', '').split('.')
     if len(version_split) != 3:
         # houston, we've got a problem!
-        write_error('Invalid version in {} "{}": {}'.format(place_type, section_name, version))
+        write_error(f'Invalid version in {place_type} "{section_name}": {version}')
         return None
     if update_type == UpdateType.MINOR:
         version_split[update_type] = str(int(version_split[update_type]) + 1)
@@ -55,7 +55,8 @@ def update_version(version, update_type, section_name, place_type="section"):
         version_split[update_type] = str(int(version_split[update_type]) + 1)
         version_split[UpdateType.MEDIUM] = '0'
         version_split[UpdateType.MINOR] = '0'
-    return '"{}"'.format('.'.join(version_split))
+    new_version = '.'.join(version_split)
+    return f'"{new_version}"'
 
 
 def update_crate_version(repo_name, crate_dir_path, temp_dir, update_type):
@@ -63,7 +64,7 @@ def update_crate_version(repo_name, crate_dir_path, temp_dir, update_type):
     output = file_path.replace(temp_dir, "")
     if output.startswith('/'):
         output = output[1:]
-    write_msg('=> Updating crate versions for {}'.format(file_path))
+    write_msg(f'=> Updating crate versions for {file_path}')
     content = get_file_content(file_path)
     if content is None:
         return False
@@ -80,8 +81,9 @@ def update_crate_version(repo_name, crate_dir_path, temp_dir, update_type):
             section.set('version', new_version)
             break
     result = write_into_file(file_path, str(toml))
-    write_msg('=> {}: {}'.format(output.split(os_sep)[-2],
-                                 'Failure' if result is False else 'Success'))
+    res = output.split(os_sep)[-2]
+    status = 'Failure' if result is False else 'Success'
+    write_msg(f'=> {res}: {status}')
     return result
 
 
@@ -92,7 +94,8 @@ def get_all_versions(args, temp_dir):
         if args.specified_crate is not None and crate['crate'] != args.specified_crate:
             continue
         if not get_crate_version(crate["repository"], crate["crate"], crate["path"], temp_dir):
-            input("Couldn't find version for in `{}`...".format(join(temp_dir, crate['path'])))
+            folder = join(temp_dir, crate['path'])
+            input(f"Couldn't find version for in `{folder}`...")
     write_msg('Done!')
 
 
@@ -101,7 +104,7 @@ def get_crate_version(repo_name, crate_name, crate_dir_path, temp_dir):
     output = file_path.replace(temp_dir, "")
     if output.startswith('/'):
         output = output[1:]
-    write_msg('=> Updating versions for {}'.format(file_path))
+    write_msg(f'=> Updating versions for {file_path}')
     content = get_file_content(file_path)
     if content is None:
         return False
@@ -166,7 +169,7 @@ def update_crate_cargo_file(path, temp_dir):
     output = file_path.replace(temp_dir, "")
     if output.startswith('/'):
         output = output[1:]
-    write_msg('=> Updating versions for {}'.format(file_path))
+    write_msg(f'=> Updating versions for {file_path}')
     content = get_file_content(file_path)
     if content is None:
         return False
@@ -191,9 +194,11 @@ def update_crate_cargo_file(path, temp_dir):
                         parts = [y.strip() for y in info[1:-1].split(',')]
                         parts = [y for y in parts
                                  if not y.startswith("git ") and not y.startswith("git=")]
-                        parts.append('version = {}'.format(CRATES_VERSION[crate_name]))
+                        version = CRATES_VERSION[crate_name]
+                        parts.append(f'version = {version}')
                         if len(parts) > 1:
-                            entry['value'] = '{{{}}}'.format(', '.join(parts))
+                            joined = ', '.join(parts)
+                            entry['value'] = f'{{{joined}}}'
                         else:
                             entry['value'] = CRATES_VERSION[entry['key']]
                     else:
@@ -203,9 +208,9 @@ def update_crate_cargo_file(path, temp_dir):
         out += '\n'
     result = True
     result = write_into_file(file_path, out)
-    write_msg('=> {}: {}'.format(
-        output.split(os_sep)[-2],
-        'Failure' if result is False else 'Success'))
+    res = output.split(os_sep)[-2]
+    status = 'Failure' if result is False else 'Success'
+    write_msg(f'=> {res}: {status}')
     return result
 
 
@@ -222,7 +227,7 @@ def write_merged_prs(merged_prs, contributors, repo_url):
                       .replace(']', '\\]')
                       .replace('*', '\\*')
                       .replace('_', '\\_'))
-        content += ' * [{}]({}/pull/{})\n'.format(md_content, repo_url, merged_pr.number)
+        content += f' * [{md_content}]({repo_url}/pull/{merged_pr.number})\n'
     return content + '\n'
 
 
@@ -230,12 +235,15 @@ def build_blog_post(repositories, temp_dir, token, args):
     # pylint: disable=too-many-locals,too-many-statements
     write_msg('=> Building blog post...')
 
-    content = '''---
+    author = input('Enter author name: ')
+    title = input('Enter title: ')
+    blog_post_date = time.strftime("%Y-%m-%d %H:00:00 +0000")
+    content = f'''---
 layout: post
-author: {}
-title: {}
+author: {author}
+title: {title}
 categories: [front, crates]
-date: {}
+date: {blog_post_date}
 ---
 
 * Write intro here *
@@ -244,8 +252,7 @@ date: {}
 
 For the interested ones, here is the list of the merged pull requests:
 
-'''.format(input('Enter author name: '), input('Enter title: '),
-           time.strftime("%Y-%m-%d %H:00:00 +0000"))
+'''
     contributors = []
     git = Github(token)
     oldest_date = None
@@ -253,51 +260,51 @@ For the interested ones, here is the list of the merged pull requests:
     for repo in repositories:
         success, out, err = get_last_commit_date(repo, temp_dir)
         if not success:
-            write_msg("Couldn't get PRs for '{}': {}".format(repo, err))
+            write_msg(f"Couldn't get PRs for '{repo}': {err}")
             continue
         max_date = datetime.date.fromtimestamp(int(out))
         if oldest_date is None or max_date < oldest_date:
             oldest_date = max_date
-        write_msg("Gettings merged PRs from {}...".format(repo))
+        write_msg(f"Gettings merged PRs from {repo}...")
         merged_prs = git.get_pulls(repo, consts.ORGANIZATION, 'closed', max_date, only_merged=True)
-        write_msg("=> Got {} merged PRs".format(len(merged_prs)))
+        write_msg(f"=> Got {len(merged_prs)} merged PRs")
         if len(merged_prs) < 1:
             continue
-        repo_url = '{}/{}/{}'.format(consts.GITHUB_URL, consts.ORGANIZATION, repo)
-        content += '[{}]({}):\n\n'.format(repo, repo_url)
+        repo_url = f'{consts.GITHUB_URL}/{consts.ORGANIZATION}/{repo}'
+        content += f'[{repo}]({repo_url}):\n\n'
         content += write_merged_prs(merged_prs, contributors, repo_url)
 
     write_msg("Gettings merged PRs from gir...")
     merged_prs = git.get_pulls('gir', consts.ORGANIZATION, 'closed', oldest_date, only_merged=True)
-    write_msg("=> Got {} merged PRs".format(len(merged_prs)))
+    write_msg(f"=> Got {len(merged_prs)} merged PRs")
     if len(merged_prs) > 0:
-        repo_url = '{}/{}/{}'.format(consts.GITHUB_URL, consts.ORGANIZATION, 'gir')
-        content += ('All this was possible thanks to the [gtk-rs/gir]({}) project as well:\n\n'
-                    .format(repo_url))
+        repo_url = f'{consts.GITHUB_URL}/{consts.ORGANIZATION}/gir'
+        content += f'All this was possible thanks to the [gtk-rs/gir]({repo_url}) project as well:'
+        content += '\n\n'
         content += write_merged_prs(merged_prs, contributors, repo_url)
 
     content += 'Thanks to all of our contributors for their (awesome!) work on this release:\n\n'
     # Sort contributors list alphabetically with case insensitive.
     contributors = sorted(contributors, key=lambda s: s.casefold())
-    content += '\n'.join([' * [@{0}]({1}/{0})'.format(contributor, consts.GITHUB_URL)
+    content += '\n'.join([f' * [@{contributor}]({consts.GITHUB_URL}/{contributor})'
                           for contributor in contributors])
     content += '\n'
 
-    file_name = join(join(temp_dir, consts.BLOG_REPO),
-                     '_posts/{}-new-release.md'.format(time.strftime("%Y-%m-%d")))
+    current_date = time.strftime("%Y-%m-%d")
+    file_name = join(join(temp_dir, consts.BLOG_REPO), f'_posts/{current_date}-new-release.md')
     try:
-        with open(file_name, 'w') as outfile:
+        with open(file_name, 'w', encoding='utf-8') as outfile:
             outfile.write(content)
-            write_msg('New blog post written into "{}".'.format(file_name))
+            write_msg(f'New blog post written into "{file_name}".')
         add_to_commit(consts.BLOG_REPO, temp_dir, [file_name])
         commit(consts.BLOG_REPO, temp_dir, "Add new blog post")
         if not args.no_push:
-            branch_name = "release-{}".format(time.strftime("%Y-%m-%d"))
+            branch_name = f"release-{current_date}"
             push(consts.BLOG_REPO, temp_dir, branch_name)
             create_pull_request(consts.BLOG_REPO, branch_name, "master", token)
     except Exception as err:
-        write_error('build_blog_post failed: {}'.format(err))
-        write_msg('\n=> Here is the blog post content:\n{}\n<='.format(content))
+        write_error(f'build_blog_post failed: {err}')
+        write_msg(f'\n=> Here is the blog post content:\n{content}\n<=')
     write_msg('Done!')
 
 
@@ -313,9 +320,8 @@ def generate_new_tag(repository, temp_dir, specified_crate, args):
                 continue
             tag_name = CRATES_VERSION[crate['crate']]
             if crate['crate'].endswith('-sys') or crate['crate'].endswith('-sys-rs'):
-                tag_name = '{}-{}'.format(crate['crate'], tag_name)
-            write_msg('==> Creating new tag "{}" for repository "{}"...'.format(tag_name,
-                                                                                repository))
+                tag_name = f'{crate["crate"]}-{tag_name}'
+            write_msg(f'==> Creating new tag "{tag_name}" for repository "{repository}"...')
             create_tag_and_push(tag_name, repository, temp_dir)
 
 
@@ -339,8 +345,7 @@ def generate_new_branches(repository, temp_dir, specified_crate, args):
                 continue
             # We only keep major and medium version numbers, so "0.9.0" becomes "0.9".
             branch_name = shorter_version(CRATES_VERSION[crate['crate']])
-            write_msg('==> Creating new branch "{}" for repository "{}"...'.format(branch_name,
-                                                                                   repository))
+            write_msg(f'==> Creating new branch "{branch_name}" for repository "{repository}"...')
             checkout_to_new_branch(repository, temp_dir, branch_name)
             return
 
@@ -355,13 +360,13 @@ def clone_repositories(args, temp_dir):
         if crate["repository"] not in repositories:
             repositories.append(crate["repository"])
             if clone_repo(crate["repository"], temp_dir) is False:
-                write_error('Cannot clone the "{}" repository...'.format(crate["repository"]))
+                write_error(f'Cannot clone the "{crate["repository"]}" repository...')
                 return []
     if len(repositories) < 1:
-        write_msg('No crate "{}" found. Aborting...'.format(args.specified_crate))
+        write_msg(f'No crate "{args.specified_crate}" found. Aborting...')
         return []
     if clone_repo(consts.BLOG_REPO, temp_dir, depth=1) is False:
-        write_error('Cannot clone the "{}" repository...'.format(consts.BLOG_REPO))
+        write_error(f'Cannot clone the "{consts.BLOG_REPO}" repository...')
         return []
     write_msg('Done!')
     return repositories
@@ -379,12 +384,11 @@ def update_crates_versions(args, temp_dir, repositories):
         if args.specified_crate is not None and crate['crate'] != args.specified_crate:
             continue
         if update_crate_version(crate["repository"], crate["path"], temp_dir, update_type) is False:
-            write_error('The update for the "{}" crate failed...'.format(crate["crate"]))
+            write_error(f'The update for the "{crate["crate"]}" crate failed...')
             input('Press ENTER to continue...')
     write_msg('Done!')
-    write_msg('=> Committing{} to the "{}" branch...'
-              .format(" and pushing" if args.no_push is False else "",
-                      consts.MASTER_TMP_BRANCH))
+    extra = " and pushing" if args.no_push is False else ""
+    write_msg(f'=> Committing{extra} to the "{consts.MASTER_TMP_BRANCH}" branch...')
     for repo in repositories:
         commit(repo, temp_dir, "Update versions for next release [ci skip]")
         if args.no_push is False:
@@ -462,11 +466,12 @@ def start(args, temp_dir):
     update_crates_versions(args, temp_dir, repositories)
 
     write_msg("Everything is almost done now. Just need to merge the remaining pull requests...")
-    write_msg("\n{}\n".format('\n'.join(PULL_REQUESTS)))
+    pr_list = '\n'.join(PULL_REQUESTS)
+    write_msg(f"\n{pr_list}\n")
 
     write_msg('Seems like most things are done! Now remains:')
-    input('Press ENTER to leave (once done, the temporary directory "{}" will be destroyed)'
-          .format(temp_dir))
+    input(
+        f'Press ENTER to leave (once done, the temporary directory "{temp_dir}" will be destroyed)')
 
 
 def main(argv):
@@ -477,7 +482,7 @@ def main(argv):
         return
     write_msg('=> Creating temporary directory...')
     with temporary_directory() as temp_dir:
-        write_msg('Temporary directory created in "{}"'.format(temp_dir))
+        write_msg(f'Temporary directory created in "{temp_dir}"')
         start(args, temp_dir)
 
 
