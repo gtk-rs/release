@@ -338,23 +338,6 @@ For the interested ones, here is the list of the merged pull requests:
     write_msg('Done!')
 
 
-def generate_new_tag(repository, temp_dir, specified_crate, args):
-    # We make a new tag for every crate:
-    #
-    # * If it is a "sys" crate, then we add its name to the tag
-    # * If not, then we just keep its version number
-    for crate in args.crates:
-        crate = crate['crate']
-        if crate['repository'] == repository:
-            if specified_crate is not None and crate['crate'] != specified_crate:
-                continue
-            tag_name = CRATES_VERSION[crate['crate']]
-            if crate['crate'].endswith('-sys') or crate['crate'].endswith('-sys-rs'):
-                tag_name = f'{crate["crate"]}-{tag_name}'
-            write_msg(f'==> Creating new tag "{tag_name}" for repository "{repository}"...')
-            create_tag_and_push(tag_name, repository, temp_dir)
-
-
 def shorter_version(version):
     return '.'.join(version.split('.')[:2]).replace('"', '')
 
@@ -459,18 +442,21 @@ def push_new_version_branches_and_tags(args, temp_dir, repositories):
     for repository in repositories:
         for crate in args.crates:
             crate = crate['crate']
-            if crate['repository'] == repository:
-                if args.tags_only is False:
-                    commit_and_push(
-                        repository,
-                        temp_dir,
-                        'Update Cargo.toml format for release',
-                        shorter_version(CRATES_VERSION[crate['crate']]))
-                create_tag_and_push(
-                    CRATES_VERSION[crate['crate']],
+            if (crate['repository'] != repository or
+                crate['crate'].endswith('-sys') or
+                crate['crate'].endswith('-sys-rs')):
+                continue
+            if args.tags_only is False:
+                commit_and_push(
                     repository,
-                    temp_dir)
-                break
+                    temp_dir,
+                    'Update Cargo.toml format for release',
+                    shorter_version(CRATES_VERSION[crate['crate']]))
+            create_tag_and_push(
+                CRATES_VERSION[crate['crate']],
+                repository,
+                temp_dir)
+            break
 
 
 def start(args, temp_dir):
