@@ -234,7 +234,7 @@ def write_merged_prs(merged_prs, contributors, repo_url):
 def downgrade_version(version):
     # We need to remove the '"' from the version number.
     parts = version.replace('"', '').split(".")
-    while len(parts) < 2:
+    while len(parts) < 3:
         parts.append('0')
     for pos, part in enumerate(parts):
         tmp = int(part)
@@ -243,7 +243,7 @@ def downgrade_version(version):
             parts[pos] = str(tmp)
             pos += 1
             while pos < len(parts):
-                parts[pos] = 0
+                parts[pos] = '0'
                 pos += 1
             break
     return '.'.join(parts)
