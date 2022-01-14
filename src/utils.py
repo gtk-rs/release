@@ -258,6 +258,13 @@ def checkout_to_new_branch(repo_name, temp_dir, target_branch):
         input("Fix the error and then press ENTER")
 
 
+def revert_git_history(repo_name, temp_dir, nb_actions_to_revert):
+    repo_path = join(temp_dir, repo_name)
+    command = ['bash', '-c', f'cd {repo_path} && git reset --hard HEAD@{{{nb_actions_to_revert}}}']
+    if not exec_command_and_print_error(command):
+        input("Fix the error and then press ENTER")
+
+
 def get_last_commit_date(repo_name, temp_dir):
     repo_path = join(temp_dir, repo_name)
     success, out, err = exec_command(
