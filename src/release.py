@@ -22,7 +22,7 @@ from utils import add_to_commit, clone_repo
 from utils import checkout_target_branch, get_file_content, write_error, write_into_file
 from utils import commit, commit_and_push, create_pull_request, push, write_msg
 from utils import create_tag_and_push, publish_crate, get_last_commit_date
-from utils import check_if_up_to_date, checkout_to_new_branch
+from utils import check_if_up_to_date, checkout_to_new_branch, revert_git_history
 
 
 @contextmanager
@@ -249,7 +249,7 @@ def downgrade_version(version):
     return '.'.join(parts)
 
 
-def checkout_to_last_release_branch(repo_name, temp_dir):
+def checkout_to_previous_release_branch(repo_name, temp_dir):
     for crate in consts.CRATE_LIST:
         if not crate['crate'].endswith('-sys') and crate['repository'] == repo_name:
             original_version = CRATES_VERSION[crate['crate']]
@@ -261,8 +261,10 @@ def checkout_to_last_release_branch(repo_name, temp_dir):
                 f'`{version}`, (from `{original_version}`) let\'s try to checkout to it...')
             if not checkout_target_branch(repo_name, temp_dir, version, ask_input=False):
                 input("Failed to checkout to this branch... Press ENTER to continue")
-            return
+                return False
+            return True
     write_error(f'No crate matches the repository `{repo_name}` apparently...')
+    return False
 
 
 def build_blog_post(repositories, temp_dir, token, args):
@@ -292,22 +294,26 @@ For the interested ones, here is the list of the merged pull requests:
     oldest_date = None
 
     for repo in repositories:
-        checkout_to_last_release_branch(repo, temp_dir)
+        need_revert = checkout_to_previous_release_branch(repo, temp_dir)
         success, out, err = get_last_commit_date(repo, temp_dir)
         if not success:
             write_msg(f"Couldn't get PRs for '{repo}': {err}")
-            continue
-        max_date = datetime.date.fromtimestamp(int(out))
-        if oldest_date is None or max_date < oldest_date:
-            oldest_date = max_date
-        write_msg(f"Gettings merged PRs from {repo}...")
-        merged_prs = git.get_pulls(repo, consts.ORGANIZATION, 'closed', max_date, only_merged=True)
-        write_msg(f"=> Got {len(merged_prs)} merged PRs")
-        if len(merged_prs) < 1:
-            continue
-        repo_url = f'{consts.GITHUB_URL}/{consts.ORGANIZATION}/{repo}'
-        content += f'[{repo}]({repo_url}):\n\n'
-        content += write_merged_prs(merged_prs, contributors, repo_url)
+        else:
+            max_date = datetime.date.fromtimestamp(int(out))
+            if oldest_date is None or max_date < oldest_date:
+                oldest_date = max_date
+            write_msg(f"Gettings merged PRs from {repo}...")
+            merged_prs = git.get_pulls(
+                repo, consts.ORGANIZATION, 'closed', max_date, only_merged=True)
+            write_msg(f"=> Got {len(merged_prs)} merged PRs")
+            if len(merged_prs) > 0:
+                repo_url = f'{consts.GITHUB_URL}/{consts.ORGANIZATION}/{repo}'
+                content += f'[{repo}]({repo_url}):\n\n'
+                content += write_merged_prs(merged_prs, contributors, repo_url)
+        if need_revert:
+            # If we switched back to the tag, we need to cancel this to come back to the previous
+            # repository state.
+            revert_git_history(repo, temp_dir, 1)
 
     write_msg("Gettings merged PRs from gir...")
     merged_prs = git.get_pulls('gir', consts.ORGANIZATION, 'closed', oldest_date, only_merged=True)
