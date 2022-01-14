@@ -303,7 +303,7 @@ def publish_crate(repository, crate_dir_path, temp_dir, crate_name):
     command = [
         'bash',
         '-c',
-        f'cd {path} && cargo publish --no-verify']
+        f'cd {path} && cargo publish']
     retry = 3
     error_messages = []
     final_success = False
