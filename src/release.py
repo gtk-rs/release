@@ -232,14 +232,19 @@ def write_merged_prs(merged_prs, contributors, repo_url):
 
 
 def downgrade_version(version):
-    parts = version.split(".")
-    while len(parts) < 3:
+    # We need to remove the '"' from the version number.
+    parts = version.replace('"', '').split(".")
+    while len(parts) < 2:
         parts.append('0')
     for pos, part in enumerate(parts):
         tmp = int(part)
         if tmp > 0:
             tmp -= 1
             parts[pos] = str(tmp)
+            pos += 1
+            while pos < len(parts):
+                parts[pos] = 0
+                pos += 1
             break
     return '.'.join(parts)
 
@@ -248,11 +253,11 @@ def checkout_to_last_release_branch(repo_name, temp_dir):
     for crate in consts.CRATE_LIST:
         if not crate['crate'].endswith('-sys') and crate['repository'] == repo_name:
             original_version = CRATES_VERSION[crate['crate']]
+            # In this case, we keep all three version digits because we want the previous major
+            # tag.
             version = downgrade_version(original_version)
-            # The version branches only have the two first digits.
-            version = '.'.join(version.split('.')[:2])
             write_msg(
-                f'For repository `{repo_name}`, the previous release branch was guessed as '
+                f'For repository `{repo_name}`, the previous major release tag was guessed as '
                 f'`{version}`, (from `{original_version}`) let\'s try to checkout to it...')
             if not checkout_target_branch(repo_name, temp_dir, version, ask_input=False):
                 input("Failed to checkout to this branch... Press ENTER to continue")
