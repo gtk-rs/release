@@ -134,7 +134,7 @@ def update_crates_cargo_file(args, temp_dir):
     write_msg('==> Updating versions in crates...')
     for crate in args.crates:
         crate = crate['crate']
-        update_crate_cargo_file(join(join(temp_dir, crate["repository"]), crate["path"]), temp_dir)
+        update_crate_cargo_file(join(join(temp_dir, crate['repository']), crate['path']), temp_dir)
     write_msg('Done!')
     write_msg('==> Now updating versions in examples...')
     for example in consts.EXAMPLES:
@@ -246,8 +246,8 @@ def downgrade_version(version):
 
 def checkout_to_last_release_branch(repo_name, temp_dir):
     for crate in consts.CRATE_LIST:
-        if not crate['name'].endswith('-sys') and crate['repository'] == repo_name:
-            original_version = CRATES_VERSION[crate['name']]
+        if not crate['crate'].endswith('-sys') and crate['repository'] == repo_name:
+            original_version = CRATES_VERSION[crate['crate']]
             version = downgrade_version(original_version)
             # The version branches only have the two first digits.
             version = '.'.join(version.split('.')[:2])
@@ -427,7 +427,7 @@ def publish_crates(args, temp_dir):
         if args.specified_crate is not None and crate['crate'] != args.specified_crate:
             continue
         if not crate.get('ignore', False):
-            publish_crate(crate["repository"], crate["path"], temp_dir, crate['crate'])
+            publish_crate(crate['repository'], crate['path'], temp_dir, crate['crate'])
     write_msg('Done!')
 
 
