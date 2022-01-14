@@ -153,10 +153,10 @@ class Arguments:
             write_error('Missing token argument.')
             return None
         # To make pylint happy.
-        only_checks = (instance.tags_only is False or
+        not_only_checks = (instance.tags_only is False or
                        instance.blog_only is False)
         if (instance.mode is None and
-                only_checks is False and
+                not_only_checks is True and
                 pick_update_type_for_crates is False):
             write_error('Missing update type argument.')
             return None
