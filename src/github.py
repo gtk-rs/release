@@ -58,7 +58,7 @@ def filter_data(content, to_return, max_date):
 
 
 def get_url_data(url, headers, params):
-    res = requests.get(url, headers=headers, params=params)
+    res = requests.get(url, headers=headers, params=params, timeout=30)
     if res.status_code != 200:
         if res.status_code == 403:
             # We reached the rate limit.

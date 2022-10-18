@@ -475,9 +475,11 @@ def start(args, temp_dir):
     if len(repositories) < 1:
         return
     get_all_versions(args, temp_dir)
-    generate_version_branches(args, temp_dir, repositories)
-    update_crates_cargo_file(args, temp_dir)
-    if args.no_push is False:
+    if args.blog_only is False:
+        generate_version_branches(args, temp_dir, repositories)
+    if args.blog_only is False:
+        update_crates_cargo_file(args, temp_dir)
+    if args.no_push is False and args.blog_only is False:
         push_new_version_branches_and_tags(args, temp_dir, repositories)
 
     if args.tags_only is False:

@@ -44,18 +44,25 @@ def write_into_file(file_path, content):
     return False
 
 
-def exec_command(command, timeout=None):
+def exec_command(command, timeout=None, show_output=False, cwd=None):
+    if show_output:
+        write_msg(f"Executing command {command} with cwd: {cwd}")
     # pylint: disable=consider-using-with
-    child = subprocess.Popen(command, stdout=subprocess.PIPE,
-                             stderr=subprocess.PIPE)
-    stdout, stderr = child.communicate(timeout=timeout)
-    return (child.returncode == 0,
-            convert_to_string(stdout),
-            convert_to_string(stderr))
+    child = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=cwd)
+    if timeout is not None:
+        stdout, stderr = child.communicate(timeout=timeout)
+    else:
+        stdout, stderr = child.communicate()
+    if show_output:
+        write_msg(f'== STDOUT == {stdout}')
+        write_msg(f'== STDERR == {stderr}')
+    stdout = convert_to_string(stdout)
+    stderr = convert_to_string(stderr)
+    return (child.returncode == 0, stdout, stderr)
 
 
-def exec_command_and_print_error(command, timeout=None):
-    ret, stdout, stderr = exec_command(command, timeout=timeout)
+def exec_command_and_print_error(command, timeout=None, cwd=None):
+    ret, stdout, stderr = exec_command(command, timeout=timeout, cwd=cwd)
     if not ret:
         full_command = ' '.join(command)
         write_error(f'Command "{full_command}" failed:')
@@ -80,8 +87,8 @@ def clone_repo(repo_name, temp_dir, depth=None):
             write_error(
                 f'command "{full_command}" failed: ===STDOUT===\n{stdout}\n===STDERR===\n{stderr}')
             return False
-        command = ['bash', '-c', f'cd {target_dir} && git submodule update --init']
-        if not exec_command_and_print_error(command):
+        command = ['git', 'submodule', 'update', '--init']
+        if not exec_command_and_print_error(command, cwd=target_dir):
             input('Failed to init submodule... Press ENTER to continue')
         return True
     except subprocess.TimeoutExpired:
@@ -113,9 +120,9 @@ def post_content(url, token, details, method='post', header_extras=None):
     try:
         req = None
         if method == 'post':
-            req = requests.post(url, data=json.dumps(details), headers=headers)
+            req = requests.post(url, data=json.dumps(details), headers=headers, timeout=30)
         else:
-            req = requests.put(url, data=json.dumps(details), headers=headers)
+            req = requests.put(url, data=json.dumps(details), headers=headers, timeout=30)
         try:
             req.raise_for_status()
         except Exception:
@@ -213,23 +220,24 @@ def commit_and_push(repo_name, temp_dir, commit_msg, target_branch):
 
 def commit(repo_name, temp_dir, commit_msg):
     repo_path = join(temp_dir, repo_name)
-    command = ['bash', '-c', f'cd {repo_path} && git commit . -m "{commit_msg}"']
-    if not exec_command_and_print_error(command):
+    command = ['git', 'commit', '.', '-m', commit_msg]
+    if not exec_command_and_print_error(command, cwd=repo_path):
         input("Fix the error and then press ENTER")
 
 
 def push(repo_name, temp_dir, target_branch):
     repo_path = join(temp_dir, repo_name)
-    command = ['bash', '-c', f'cd {repo_path} && git push origin HEAD:{target_branch}']
-    if not exec_command_and_print_error(command):
+    command = ['git', 'push', 'origin', f'HEAD:{target_branch}']
+    if not exec_command_and_print_error(command, cwd=repo_path):
         input("Fix the error and then press ENTER")
 
 
 def add_to_commit(repo_name, temp_dir, files_to_add):
     repo_path = join(temp_dir, repo_name)
-    files = ' '.join([f'"{f}"' for f in files_to_add])
-    command = ['bash', '-c', f'cd {repo_path} && git add {files}']
-    if not exec_command_and_print_error(command):
+    command = ['git', 'add']
+    for file in files_to_add:
+        command.append(file)
+    if not exec_command_and_print_error(command, cwd=repo_path):
         input("Fix the error and then press ENTER")
 
 
@@ -243,8 +251,8 @@ def revert_changes(repo_name, temp_dir, files):
 
 def checkout_target_branch(repo_name, temp_dir, target_branch, ask_input=True):
     repo_path = join(temp_dir, repo_name)
-    command = ['bash', '-c', f'cd {repo_path} && git checkout {target_branch}']
-    if not exec_command_and_print_error(command):
+    command = ['git', 'checkout', target_branch]
+    if not exec_command_and_print_error(command, cwd=repo_path):
         if ask_input:
             input("Fix the error and then press ENTER")
         return False
@@ -253,28 +261,29 @@ def checkout_target_branch(repo_name, temp_dir, target_branch, ask_input=True):
 
 def checkout_to_new_branch(repo_name, temp_dir, target_branch):
     repo_path = join(temp_dir, repo_name)
-    command = ['bash', '-c', f'cd {repo_path} && git checkout -b {target_branch}']
-    if not exec_command_and_print_error(command):
+    command = ['git', 'checkout', '-b', target_branch]
+    if not exec_command_and_print_error(command, cwd=repo_path):
         input("Fix the error and then press ENTER")
 
 
 def revert_git_history(repo_name, temp_dir, nb_actions_to_revert):
     repo_path = join(temp_dir, repo_name)
-    command = ['bash', '-c', f'cd {repo_path} && git reset --hard HEAD@{{{nb_actions_to_revert}}}']
-    if not exec_command_and_print_error(command):
+    command = ['git', 'reset', '--hard', f'HEAD@{{{nb_actions_to_revert}}}']
+    if not exec_command_and_print_error(command, cwd=repo_path):
         input("Fix the error and then press ENTER")
 
 
 def get_last_commit_date(repo_name, temp_dir):
     repo_path = join(temp_dir, repo_name)
     success, out, err = exec_command(
-        ['bash', '-c', f'cd {repo_path} && git log --format=%at --no-merges -n 1'])
+        ['git', 'log', '--format=%at', '--no-merges', '-n', '1'],
+        show_output=True,
+        cwd=repo_path)
     return (success, out, err)
 
 
 def get_last_commit_hash(repo_path):
-    success, out, _ = exec_command(
-        ['bash', '-c', f'cd {repo_path} && git rev-parse HEAD'])
+    success, out, _ = exec_command(['git', 'rev-parse', 'HEAD'], cwd=repo_path)
     if success is True:
         return out.strip()
     return ''
@@ -282,7 +291,7 @@ def get_last_commit_hash(repo_path):
 
 def get_repo_last_commit_hash(repo_url):
     success, out, _ = exec_command(
-        ['bash', '-c', f'git ls-remote {repo_url} HEAD'])
+        ['git', 'ls-remote', repo_url, 'HEAD'], show_output=True)
     if success is True:
         out = out.split('\n', maxsplit=1)[0].strip()
         return out.split('\t', maxsplit=1)[0].split(' ', maxsplit=1)[0]
@@ -291,8 +300,8 @@ def get_repo_last_commit_hash(repo_url):
 
 def merging_branches(repo_name, temp_dir, merge_branch):
     repo_path = join(temp_dir, repo_name)
-    command = ['bash', '-c', f'cd {repo_path} && git merge "origin/{merge_branch}"']
-    if not exec_command_and_print_error(command):
+    command = ['git', 'merge', f'origin/{merge_branch}']
+    if not exec_command_and_print_error(command, cwd=repo_path):
         input("Fix the error and then press ENTER")
 
 
@@ -300,16 +309,13 @@ def publish_crate(repository, crate_dir_path, temp_dir, crate_name):
     # pylint: disable=too-many-locals
     write_msg(f'=> publishing crate {crate_name}')
     path = join(join(temp_dir, repository), crate_dir_path)
-    command = [
-        'bash',
-        '-c',
-        f'cd {path} && cargo publish']
+    command = ['cargo', 'publish']
     retry = 3
     error_messages = []
     final_success = False
     wait_time = 30
     while retry > 0:
-        ret, stdout, stderr = exec_command(command)
+        ret, stdout, stderr = exec_command(command, cwd=path)
         if not ret:
             full_command = ' '.join(command)
             error_messages.append(f'Command "{full_command}" failed:')
@@ -364,7 +370,8 @@ def create_pull_request(repo_name, from_branch, target_branch, token, add_to_lis
 
 
 def check_if_up_to_date():
-    remote_repo = "git://github.com/gtk-rs/release.git"
+    write_msg("Checking if up-to-date...")
+    remote_repo = "git@github.com:gtk-rs/release.git"
     last_commit = get_last_commit_hash(".")
     remote_last_commit = get_repo_last_commit_hash(remote_repo)
     if last_commit != remote_last_commit:
