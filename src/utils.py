@@ -120,9 +120,9 @@ def post_content(url, token, details, method='post', header_extras=None):
     try:
         req = None
         if method == 'post':
-            req = requests.post(url, data=json.dumps(details), headers=headers)
+            req = requests.post(url, data=json.dumps(details), headers=headers, timeout=30)
         else:
-            req = requests.put(url, data=json.dumps(details), headers=headers)
+            req = requests.put(url, data=json.dumps(details), headers=headers, timeout=30)
         try:
             req.raise_for_status()
         except Exception:
