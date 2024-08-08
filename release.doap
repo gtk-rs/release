@@ -8,7 +8,7 @@
     
   <name xml:lang="en">gtk-rs</name>
   <shortdesc xml:lang="en">Rust bindings for glib, GTK, and other GNOME libraries.</shortdesc>
-  <description>The gtk-rs project provides safe bindings to the Rust language for fundamental libraries from the GNOME stack like GLib, Cairo, GTK 3 and GTK 4.</description>
+  <description>The gtk-rs project provides safe bindings to the Rust language for fundamental libraries from the GNOME stack like GLib, Cairo and GTK 4.</description>
   
   <homepage rdf:resource="http://www.gtk-rs.org" />
   <repository>
