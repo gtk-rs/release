@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Project
+    xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+    xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#"
+    xmlns:foaf="http://xmlns.com/foaf/0.1/"
+    xmlns:gnome="http://api.gnome.org/doap-extensions#"
+    xmlns="http://usefulinc.com/ns/doap#">
+    
+  <name xml:lang="en">gtk-rs</name>
+  <shortdesc xml:lang="en">Rust bindings for glib, GTK, and other GNOME libraries.</shortdesc>
+  <description>The gtk-rs project provides safe bindings to the Rust language for fundamental libraries from the GNOME stack like GLib, Cairo and GTK 4.</description>
+  
+  <homepage rdf:resource="http://www.gtk-rs.org" />
+  <repository>
+    <GitRepository>
+      <browse rdf:resource="https://github.com/gtk-rs" />
+    </GitRepository>
+  </repository>
+  
+  <programming-language>Rust</programming-language>
+  
+  <maintainer>
+    <foaf:Person>
+      <foaf:name>Bilal Elmoussaoui</foaf:name>
+      <foaf:mbox rdf:resource="mailto:bilal.elmoussaoui@gnome.org" />
+      <gnome:userid>bilelmoussaoui</gnome:userid>
+    </foaf:Person>
+  </maintainer>
+  
+  <maintainer>
+    <foaf:Person>
+      <foaf:name>Sebastian Dröge</foaf:name>
+      <foaf:mbox rdf:resource="mailto:slomo@coaxion.net"/>
+      <gnome:userid>sdroege</gnome:userid>
+    </foaf:Person>
+  </maintainer>
+
+  <maintainer>
+    <foaf:Person>
+      <foaf:name>Guillaume Gomez</foaf:name>
+      <foaf:mbox rdf:resource="mailto:guillaume1.gomez@gmail.com" />
+      <foaf:account>
+        <foaf:OnlineAccount>
+          <foaf:accountServiceHomepage rdf:resource="https://github.com"/>
+          <foaf:accountName>GuillaumeGomez</foaf:accountName>
+        </foaf:OnlineAccount>
+      </foaf:account>
+    </foaf:Person>
+  </maintainer>
+
+</Project>
