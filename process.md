@@ -15,5 +15,5 @@
   - `cd ./stable/latest`
   - `ln -sf ../$version/docs ./docs`
 - Squash the commits in `gh-pages` while you are at it
-- Update versions in master to the next one
+- Update versions in main to the next one
 - 🎉

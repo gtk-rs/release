@@ -21,7 +21,7 @@ def github_search(token, repo_name, start_date, end_date):
     query = """
 query {
   
-  search(query: "repo:gtk-rs/{repo_name} is:pr is:closed merged:{start_date}..{end_date} base:master sort:created-desc -author:app/dependabot", type: ISSUE, last: 100) {
+  search(query: "repo:gtk-rs/{repo_name} is:pr is:closed merged:{start_date}..{end_date} base:main sort:created-desc -author:app/dependabot", type: ISSUE, last: 100) {
     edges {
       node {
         ... on PullRequest {
