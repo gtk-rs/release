@@ -12,29 +12,32 @@ import requests
 import getopt
 
 REPOSITORIES = [
-    {"name": "gtk4-rs", "start-at": "2023-07-23", "end-at": "2024-02-04"},
-    {"name": "gtk-rs-core", "start-at": "2023-07-23", "end-at": "2024-02-04"},
+    {"name": "gtk4-rs", "start-at": "2024-07-10", "end-at": "2025-07-15"},
+    {"name": "gtk-rs-core", "start-at": "2024-07-10", "end-at": "2025-07-15"},
 ]
 
 
 def github_search(token, repo_name, start_date, end_date):
     query = """
 query {
-  
-  search(query: "repo:gtk-rs/{repo_name} is:pr is:closed merged:{start_date}..{end_date} base:main sort:created-desc -author:app/dependabot", type: ISSUE, last: 100) {
-    edges {
-      node {
-        ... on PullRequest {
-          url 
-          title
-          mergedAt
-          author {
-            login
-          }
+    search(
+    query: "repo:gtk-rs/{repo_name} is:pr is:closed merged:{start_date}..{end_date} base:main sort:created-desc -author:app/dependabot -author:app/github-actions",
+    type: ISSUE,
+    last: 100
+    ) {
+        edges {
+            node {
+                ... on PullRequest {
+                    url
+                    title
+                    mergedAt
+                    author {
+                        login
+                    }
+                }
+            }
         }
-      }
     }
-  }
 }
 """.replace("{repo_name}", repo_name)
     query = query.replace("{start_date}", start_date)
